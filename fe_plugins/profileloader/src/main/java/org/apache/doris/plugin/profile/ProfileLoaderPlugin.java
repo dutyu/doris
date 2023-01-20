@@ -39,7 +39,6 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
@@ -197,8 +196,6 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
                 resetLogBufferAndLastLoadTime(currentTime);
             }
         }
-
-        return;
     }
 
     private void resetLogBufferAndLastLoadTime(long currentTime) {
@@ -294,10 +291,4 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
         }
     }
 
-    public static String longToTimeString(long timeStamp) {
-        if (timeStamp <= 0L) {
-            return "1970-01-01 08:00:00";
-        }
-        return dateFormatContainer.get().format(new Date(timeStamp));
-    }
 }
