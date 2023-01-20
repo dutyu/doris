@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -15,9 +16,23 @@
 # specific language governing permissions and limitations
 # under the License.
 
-name=AuditLoader
-type=AUDIT
-description=load audit log to olap load, and user can view the statistic of queries
-version=1.0.0
-java.version=1.8.0
-classname=org.apache.doris.plugin.audit.ProfileLoaderPlugin
+set -eo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+
+export DORIS_HOME="${ROOT}/../.."
+
+. "${DORIS_HOME}/env.sh"
+
+export PROFILE_LOADER_HOME="${ROOT}"
+
+"${MVN_CMD}" clean package -DskipTests
+
+echo "Install ProfileLoader..."
+
+PROFILE_LOADER_OUTPUT="${PROFILE_LOADER_HOME}/output"
+rm -rf "${PROFILE_LOADER_OUTPUT}"
+mkdir "${PROFILE_LOADER_OUTPUT}"
+cp "${PROFILE_LOADER_HOME}/target/profileloader.zip" "${PROFILE_LOADER_HOME}/output"/
+
+echo "Build ProfileLoader Finished"
