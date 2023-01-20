@@ -145,16 +145,16 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
         logBuffer.append(event.queryId).append("\t");
         logBuffer.append(event.user).append("\t");
         logBuffer.append(event.defaultDb).append("\t");
-        // trim the stmt to avoid too long
-        // use `getBytes().length` to get real byte length
-        String stmt = truncateByBytes(event.stmt, conf.max_stmt_length).replace("\t", " ");
-        logBuffer.append(stmt).append("\t");
         logBuffer.append(event.queryType).append("\t");
         logBuffer.append(event.startTime).append("\t");
         logBuffer.append(event.endTime).append("\t");
         logBuffer.append(event.totalTime).append("\t");
         logBuffer.append(event.queryState).append("\t");
         logBuffer.append(event.traceId).append("\t");
+        // trim the stmt to avoid too long
+        // use `getBytes().length` to get real byte length
+        String stmt = truncateByBytes(event.stmt, conf.max_stmt_length).replace("\t", " ");
+        logBuffer.append(stmt).append("\t");
         // trim the profile to avoid too long
         // use `getBytes().length` to get real byte length
         String profile = truncateByBytes(event.profile, conf.max_profile_length).replace("\t", " ");

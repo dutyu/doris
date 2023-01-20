@@ -67,8 +67,8 @@ public class DorisStreamLoader {
         conn.addRequestProperty("label", label);
         conn.addRequestProperty("line_delimiter", "\\x01");
         conn.addRequestProperty("max_filter_ratio", "1.0");
-        conn.addRequestProperty("columns", "job_id, query_id, user, db, stmt, query_type, start_time, " +
-                "end_time, total_time, query_state, trace_id, profile");
+        conn.addRequestProperty("columns", "job_id, query_id, user, db, query_type, start_time, " +
+                "end_time, total_time, query_state, trace_id, stmt, profile");
 
         conn.setDoOutput(true);
         conn.setDoInput(true);
@@ -85,8 +85,8 @@ public class DorisStreamLoader {
         sb.append("-H \"").append("line_delimiter\":").append("\"\\x01\" \\\n  ");
         sb.append("-H \"").append("max_filter_ratio\":").append("\"1.0\" \\\n  ");
         sb.append("-H \"").append("columns\":")
-                .append("\"job_id, query_id, user, db, stmt, query_type, start_time, \" +\n" +
-                "                \"end_time, total_time, query_state, trace_id, profile\" \\\n  ");
+                .append("\"job_id, query_id, user, db, query_type, start_time, \" +\n" +
+                "                \"end_time, total_time, query_state, trace_id, stmt, profile\" \\\n  ");
         sb.append("\"").append(conn.getURL()).append("\"");
         return sb.toString();
     }
