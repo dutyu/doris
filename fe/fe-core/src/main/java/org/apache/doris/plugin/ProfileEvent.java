@@ -28,6 +28,8 @@ public class ProfileEvent extends Event {
     public String startTime = "";
     public String endTime = "";
     public String totalTime = "";
+    // worker thread of profile plugin will calculate this field
+    public long totalTimeMs = -1L;
     public String queryState = "";
     public String traceId = "";
     public String profile = "";

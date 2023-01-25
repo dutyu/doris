@@ -17,7 +17,8 @@
 
 package org.apache.doris.plugin.profile;
 
-import com.google.common.collect.Queues;
+
+import org.apache.doris.common.util.DebugUtil;
 import org.apache.doris.plugin.Plugin;
 import org.apache.doris.plugin.PluginContext;
 import org.apache.doris.plugin.PluginException;
@@ -27,6 +28,8 @@ import org.apache.doris.plugin.ProfilePlugin;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Queues;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,9 +41,10 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.text.SimpleDateFormat;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -52,19 +56,13 @@ import java.util.stream.Collectors;
 public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
     private final static Logger LOG = LogManager.getLogger(ProfileLoaderPlugin.class);
 
-    private static final ThreadLocal<SimpleDateFormat> dateFormatContainer = ThreadLocal.withInitial(
-        () -> new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"));
-
-    private StringBuilder profileLogBuffer = new StringBuilder();
-    private long lastLoadTimeProfileLog = 0;
+    private static final String COLUMN_SEPARATOR = new String(new byte[]{0x01});
+    private static final String LINE_DELIMITER = new String(new byte[]{0x00});
 
     private BlockingQueue<ProfileEvent> profileEventQueue;
-    private DorisStreamLoader streamLoader;
-    private Thread loadThread;
-
-    private ProfileLoaderConf conf;
     private volatile boolean isClosed = false;
     private volatile boolean isInit = false;
+    private volatile Thread loadThread;
 
     @Override
     public void init(PluginInfo info, PluginContext ctx) throws PluginException {
@@ -74,20 +72,16 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
             if (isInit) {
                 return;
             }
-            this.lastLoadTimeProfileLog = System.currentTimeMillis();
-
-            loadConfig(ctx, info.getProperties());
-
+            ProfileLoaderConf conf = buildConfig(ctx, info.getProperties());
             this.profileEventQueue = Queues.newLinkedBlockingDeque(conf.maxQueueSize);
-            this.streamLoader = new DorisStreamLoader(conf);
-            this.loadThread = new Thread(new LoadWorker(this.streamLoader), "profile loader thread");
+            this.loadThread = new Thread(new LoadWorker(conf), "profile loader thread");
             this.loadThread.start();
 
             isInit = true;
         }
     }
 
-    private void loadConfig(PluginContext ctx, Map<String, String> pluginInfoProperties) throws PluginException {
+    private ProfileLoaderConf buildConfig(PluginContext ctx, Map<String, String> pluginInfoProperties) throws PluginException {
         Path pluginPath = FileSystems.getDefault().getPath(ctx.getPluginPath());
         if (!Files.exists(pluginPath)) {
             throw new PluginException("plugin path does not exist: " + pluginPath);
@@ -109,11 +103,9 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
             props.setProperty(entry.getKey(), entry.getValue());
         }
 
-        final Map<String, String> properties = props.stringPropertyNames().stream()
-            .collect(Collectors.toMap(Function.identity(), props::getProperty));
-        conf = new ProfileLoaderConf();
-        conf.init(properties);
-        conf.feIdentity = ctx.getFeIdentity();
+        Map<String, String> properties = props.stringPropertyNames().stream()
+                .collect(Collectors.toMap(Function.identity(), props::getProperty));
+        return new ProfileLoaderConf(properties, ctx.getFeIdentity());
     }
 
     @Override
@@ -140,70 +132,60 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
         }
     }
 
-    private void fillLogBuffer(ProfileEvent event, StringBuilder logBuffer) {
-        logBuffer.append(event.jobId).append("\t");
-        logBuffer.append(event.queryId).append("\t");
-        logBuffer.append(event.user).append("\t");
-        logBuffer.append(event.defaultDb).append("\t");
-        logBuffer.append(event.queryType).append("\t");
-        logBuffer.append(event.startTime).append("\t");
-        logBuffer.append(event.endTime).append("\t");
-        logBuffer.append(event.totalTime).append("\t");
-        logBuffer.append(event.queryState).append("\t");
-        logBuffer.append(event.traceId).append("\t");
-        // trim the stmt to avoid too long
-        // use `getBytes().length` to get real byte length
-        String stmt = truncateByBytes(event.stmt, conf.max_stmt_length).replace("\t", " ");
-        logBuffer.append(stmt).append("\t");
-        // trim the profile to avoid too long
-        // use `getBytes().length` to get real byte length
-        String profile = truncateByBytes(event.profile, conf.max_profile_length).replace("\t", " ");
-        byte[] delimiter = new byte[1];
-        delimiter[0] = 0x01;
-        logBuffer.append(profile).append(new String(delimiter));
-    }
+    public static class ProfileLoaderConf {
 
-    private String truncateByBytes(String str, int length) {
-        int maxLen = Math.min(length, str.getBytes().length);
-        if (maxLen >= str.getBytes().length) {
-            return str;
-        }
-        Charset utf8Charset = Charset.forName("UTF-8");
-        CharsetDecoder decoder = utf8Charset.newDecoder();
-        byte[] sb = str.getBytes();
-        ByteBuffer buffer = ByteBuffer.wrap(sb, 0, maxLen);
-        CharBuffer charBuffer = CharBuffer.allocate(maxLen);
-        decoder.onMalformedInput(CodingErrorAction.IGNORE);
-        decoder.decode(buffer, charBuffer, true);
-        decoder.flush(charBuffer);
-        return new String(charBuffer.array(), 0, charBuffer.position());
-    }
-
-    private void loadIfNecessary(DorisStreamLoader loader) {
-        StringBuilder logBuffer = profileLogBuffer;
-        long lastLoadTime = lastLoadTimeProfileLog;
-        long currentTime = System.currentTimeMillis();
-
-        if (logBuffer.length() >= conf.maxBatchSize || currentTime - lastLoadTime >= conf.maxBatchIntervalSec * 1000) {
-            // begin to load
+        public ProfileLoaderConf(Map<String, String> properties, String feIdentity) throws PluginException {
             try {
-                DorisStreamLoader.LoadResponse response = loader.loadBatch(logBuffer.toString().getBytes());
-                LOG.info("profile loader response: {}", response);
+                this.feIdentity = feIdentity;
+                maxBatchSize = properties.containsKey(PROP_MAX_BATCH_SIZE) ?
+                        Long.valueOf(properties.get(PROP_MAX_BATCH_SIZE)) : DEFAULT_MAX_BATCH_SIZE;
+
+                maxBatchIntervalSec = properties.containsKey(PROP_MAX_BATCH_INTERVAL_SEC) ?
+                        Long.valueOf(properties.get(PROP_MAX_BATCH_INTERVAL_SEC)) : DEFAULT_MAX_BATCH_INTERVAL_SEC;
+
+                maxQueueSize = properties.containsKey(PROP_MAX_QUEUE_SIZE) ?
+                        Integer.valueOf(properties.get(PROP_MAX_QUEUE_SIZE)) : DEFAULT_MAX_QUEUE_SIZE;
+
+                frontendHostPort = properties.containsKey(PROP_FRONTEND_HOST_PORT) ?
+                        properties.get(PROP_FRONTEND_HOST_PORT) : DEFAULT_FRONTEND_HOST_PORT;
+
+                user = properties.containsKey(PROP_USER) ? properties.get(PROP_USER) : DEFAULT_USER;
+
+                password = properties.containsKey(PROP_PASSWORD) ? properties.get(PROP_PASSWORD) : DEFAULT_PASSWORD;
+
+                database = properties.containsKey(PROP_DATABASE) ? properties.get(PROP_DATABASE) : DEFAULT_DATABASE;
+
+                profileLogTable = properties.containsKey(PROP_PROFILE_LOG_TABLE) ?
+                        properties.get(PROP_PROFILE_LOG_TABLE) : DEFAULT_PROFILE_LOG_TABLE;
+
+                maxStmtLength = properties.containsKey(PROP_MAX_STMT_LENGTH) ?
+                        Integer.parseInt(properties.get(PROP_MAX_STMT_LENGTH)) : DEFAULT_MAX_STMT_LENGTH;
+
+                maxProfileLength = properties.containsKey(PROP_MAX_PROFILE_LENGTH) ?
+                        Integer.parseInt(properties.get(PROP_MAX_PROFILE_LENGTH)) : DEFAULT_MAX_PROFILE_LENGTH;
+
+                skipStmt = properties.containsKey(PROP_SKIP_STMT) ?
+                        Boolean.parseBoolean(properties.get(PROP_SKIP_STMT)) :
+                        DEFAULT_SKIP_STMT;
+
+                skipTypes = properties.containsKey(PROP_SKIP_TYPES) ?
+                        ImmutableSet.copyOf(properties.get(PROP_SKIP_TYPES).trim().split(",")) :
+                        DEFAULT_SKIP_TYPES;
+
+                slowQueryMs = properties.containsKey(PROP_SLOW_QUERY_MS) ?
+                        Integer.parseInt(properties.get(PROP_SLOW_QUERY_MS)) : DEFAULT_SLOW_QUERY_MS;
+
+                slowLoadMs = properties.containsKey(PROP_SLOW_LOAD_MS) ?
+                        Integer.parseInt(properties.get(PROP_SLOW_LOAD_MS)) : DEFAULT_SLOW_LOAD_MS;
+
+                slowExportMs = properties.containsKey(PROP_SLOW_EXPORT_MS) ?
+                        Integer.parseInt(properties.get(PROP_SLOW_EXPORT_MS)) : DEFAULT_SLOW_EXPORT_MS;
+
             } catch (Exception e) {
-                LOG.warn("encounter exception when putting current profile batch, discard current batch", e);
-            } finally {
-                // make a new string builder to receive following events.
-                resetLogBufferAndLastLoadTime(currentTime);
+                throw new PluginException(e.getMessage());
             }
         }
-    }
 
-    private void resetLogBufferAndLastLoadTime(long currentTime) {
-        this.profileLogBuffer = new StringBuilder();
-        lastLoadTimeProfileLog = currentTime;
-    }
-
-    public static class ProfileLoaderConf {
         public static final String PROP_MAX_BATCH_SIZE = "max_batch_size";
         public static final String PROP_MAX_BATCH_INTERVAL_SEC = "max_batch_interval_sec";
         public static final String PROP_MAX_QUEUE_SIZE = "max_queue_size";
@@ -212,83 +194,168 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
         public static final String PROP_PASSWORD = "password";
         public static final String PROP_DATABASE = "database";
         public static final String PROP_PROFILE_LOG_TABLE = "profile_log_table";
-        // the max stmt and profile length to be loaded in profile table.
-        public static final String MAX_STMT_LENGTH = "max_stmt_length";
-        public static final String MAX_PROFILE_LENGTH = "max_profile_length";
+        // the max stmt length to be loaded in profile table.
+        public static final String PROP_MAX_STMT_LENGTH = "max_stmt_length";
+        // the max profile length to be loaded in profile table.
+        public static final String PROP_MAX_PROFILE_LENGTH = "max_profile_length";
+        public static final String PROP_SKIP_STMT = "skip_stmt";
+        public static final String PROP_SKIP_TYPES = "skip_types";
+        public static final String PROP_SLOW_QUERY_MS = "slow_query_ms";
+        public static final String PROP_SLOW_LOAD_MS = "slow_load_ms";
+        public static final String PROP_SLOW_EXPORT_MS = "slow_export_ms";
 
-        public long maxBatchSize = 50 * 1024 * 1024;
-        public long maxBatchIntervalSec = 60;
-        public int maxQueueSize = 1000;
-        public String frontendHostPort = "127.0.0.1:8030";
-        public String user = "root";
-        public String password = "";
-        public String database = "doris_audit_db__";
-        public String profileLogTable = "doris_profile_log_tbl__";
+        public static final long DEFAULT_MAX_BATCH_SIZE = 50 * 1024 * 1024;
+        public static final long DEFAULT_MAX_BATCH_INTERVAL_SEC = 60;
+        public static final int DEFAULT_MAX_QUEUE_SIZE = 1000;
+        public static final String DEFAULT_FRONTEND_HOST_PORT = "127.0.0.1:8030";
+        public static final String DEFAULT_USER = "root";
+        public static final String DEFAULT_PASSWORD = "";
+        public static final String DEFAULT_DATABASE = "doris_audit_db__";
+        public static final String DEFAULT_PROFILE_LOG_TABLE = "doris_profile_log_tbl__";
+        public static final boolean DEFAULT_SKIP_STMT = true;
+        public static final Set<String> DEFAULT_SKIP_TYPES = Collections.EMPTY_SET;
+        public static final int DEFAULT_MAX_STMT_LENGTH = 4096;
+        public static final int DEFAULT_MAX_PROFILE_LENGTH = 81920;
+        public static final int DEFAULT_SLOW_QUERY_MS = 15000;
+        public static final int DEFAULT_SLOW_LOAD_MS = 1800000;
+        public static final int DEFAULT_SLOW_EXPORT_MS = 1800000;
+
+        public final long maxBatchSize;
+        public final long maxBatchIntervalSec;
+        public final int maxQueueSize;
+        public final String frontendHostPort;
+        public final String user;
+        public final String password;
+        public final String database;
+        public final String profileLogTable;
         // the identity of FE which run this plugin
-        public String feIdentity = "";
-        public int max_stmt_length = 4096;
-        public int max_profile_length = 81920;
+        public final String feIdentity;
+        public final boolean skipStmt;
+        public final Set<String> skipTypes;
+        public final int maxStmtLength;
+        public final int maxProfileLength;
+        public final int slowQueryMs;
+        public final int slowLoadMs;
+        public final int slowExportMs;
 
-        public void init(Map<String, String> properties) throws PluginException {
-            try {
-                if (properties.containsKey(PROP_MAX_BATCH_SIZE)) {
-                    maxBatchSize = Long.valueOf(properties.get(PROP_MAX_BATCH_SIZE));
-                }
-                if (properties.containsKey(PROP_MAX_BATCH_INTERVAL_SEC)) {
-                    maxBatchIntervalSec = Long.valueOf(properties.get(PROP_MAX_BATCH_INTERVAL_SEC));
-                }
-                if (properties.containsKey(PROP_MAX_QUEUE_SIZE)) {
-                    maxQueueSize = Integer.valueOf(properties.get(PROP_MAX_QUEUE_SIZE));
-                }
-                if (properties.containsKey(PROP_FRONTEND_HOST_PORT)) {
-                    frontendHostPort = properties.get(PROP_FRONTEND_HOST_PORT);
-                }
-                if (properties.containsKey(PROP_USER)) {
-                    user = properties.get(PROP_USER);
-                }
-                if (properties.containsKey(PROP_PASSWORD)) {
-                    password = properties.get(PROP_PASSWORD);
-                }
-                if (properties.containsKey(PROP_DATABASE)) {
-                    database = properties.get(PROP_DATABASE);
-                }
-                if (properties.containsKey(PROP_PROFILE_LOG_TABLE)) {
-                    profileLogTable = properties.get(PROP_PROFILE_LOG_TABLE);
-                }
-                if (properties.containsKey(MAX_STMT_LENGTH)) {
-                    max_stmt_length = Integer.parseInt(properties.get(MAX_STMT_LENGTH));
-                }
-                if (properties.containsKey(MAX_PROFILE_LENGTH)) {
-                    max_profile_length = Integer.parseInt(properties.get(MAX_PROFILE_LENGTH));
-                }
-            } catch (Exception e) {
-                throw new PluginException(e.getMessage());
-            }
-        }
     }
 
     private class LoadWorker implements Runnable {
-        private DorisStreamLoader loader;
+        private final DorisStreamLoader loader;
+        private final ProfileLoaderConf conf;
+        private volatile long lastLoadTimeProfileLog;
 
-        public LoadWorker(DorisStreamLoader loader) {
-            this.loader = loader;
+        public LoadWorker(ProfileLoaderConf conf) {
+            this.conf = conf;
+            this.loader = new DorisStreamLoader(conf);
+            this.lastLoadTimeProfileLog = System.currentTimeMillis();
         }
 
         public void run() {
+            StringBuilder profileLogBuffer = new StringBuilder();
             while (!isClosed) {
                 try {
                     ProfileEvent event = profileEventQueue.poll(5, TimeUnit.SECONDS);
                     if (event != null) {
+                        if (!filterEvent(event)) {
+                            continue;
+                        }
                         fillLogBuffer(event, profileLogBuffer);
-                        loadIfNecessary(loader);
+                        if (loadIfNecessary(profileLogBuffer)) {
+                            profileLogBuffer = new StringBuilder();
+                        }
                     }
                 } catch (InterruptedException ie) {
-                    LOG.debug("encounter exception when loading current profile batch", ie);
+                    LOG.debug("Encounter exception when loading current profile batch", ie);
                 } catch (Exception e) {
                     LOG.error("LoadWorker run failed for profile loader, error:", e);
                 }
             }
         }
+
+        private boolean filterEvent(ProfileEvent event) {
+            if (conf.skipTypes.contains(event.queryType)) {
+                return false;
+            }
+
+            long totalTimeMs = -1L;
+            try {
+                totalTimeMs = DebugUtil.convertPrettyStringToMs(event.totalTime);
+                event.totalTimeMs = totalTimeMs;
+            } catch (Exception e) {
+                LOG.debug("Format of totalTime is not right, totalTime: " + event.totalTime, e);
+            }
+
+            switch (event.queryType) {
+                case "Query":
+                    return totalTimeMs >= conf.slowQueryMs;
+                case "Load":
+                    return totalTimeMs >= conf.slowLoadMs;
+                case "Export":
+                    return totalTimeMs >= conf.slowExportMs;
+                default:
+                    return true;
+            }
+        }
+
+        private boolean loadIfNecessary(StringBuilder logBuffer) {
+            long currentTime = System.currentTimeMillis();
+
+            if (logBuffer.length() >= conf.maxBatchSize
+                    || currentTime - lastLoadTimeProfileLog >= conf.maxBatchIntervalSec * 1000) {
+                // begin to load
+                try {
+                    DorisStreamLoader.LoadResponse response = loader.loadBatch(logBuffer.toString().getBytes());
+                    LOG.info("Profile loader response: {}", response);
+                } catch (Exception e) {
+                    LOG.warn("Encounter exception when putting current profile batch, discard current batch", e);
+                } finally {
+                    // make a new string builder to receive following events.
+                    lastLoadTimeProfileLog = currentTime;
+                }
+                return true;
+            }
+            return false;
+        }
+
+        private void fillLogBuffer(ProfileEvent event, StringBuilder logBuffer) {
+            logBuffer.append(event.jobId).append(COLUMN_SEPARATOR);
+            logBuffer.append(event.queryId).append(COLUMN_SEPARATOR);
+            logBuffer.append(event.user).append(COLUMN_SEPARATOR);
+            logBuffer.append(event.defaultDb).append(COLUMN_SEPARATOR);
+            logBuffer.append(event.queryType).append(COLUMN_SEPARATOR);
+            logBuffer.append(event.startTime).append(COLUMN_SEPARATOR);
+            logBuffer.append(event.endTime).append(COLUMN_SEPARATOR);
+            logBuffer.append(event.totalTime).append(COLUMN_SEPARATOR);
+            logBuffer.append(event.totalTimeMs).append(COLUMN_SEPARATOR);
+            logBuffer.append(event.queryState).append(COLUMN_SEPARATOR);
+            logBuffer.append(event.traceId).append(COLUMN_SEPARATOR);
+            // trim the stmt to avoid too long
+            // use `getBytes().length` to get real byte length
+            String stmt = conf.skipStmt ? "N/A" : truncateByBytes(event.stmt, conf.maxStmtLength);
+            logBuffer.append(stmt).append(COLUMN_SEPARATOR);
+            // trim the profile to avoid too long
+            // use `getBytes().length` to get real byte length
+            String profile = truncateByBytes(event.profile, conf.maxProfileLength);
+            logBuffer.append(profile).append(LINE_DELIMITER);
+        }
+
+        private String truncateByBytes(String str, int length) {
+            int maxLen = Math.min(length, str.getBytes().length);
+            if (maxLen >= str.getBytes().length) {
+                return str;
+            }
+            Charset utf8Charset = Charset.forName("UTF-8");
+            CharsetDecoder decoder = utf8Charset.newDecoder();
+            byte[] sb = str.getBytes();
+            ByteBuffer buffer = ByteBuffer.wrap(sb, 0, maxLen);
+            CharBuffer charBuffer = CharBuffer.allocate(maxLen);
+            decoder.onMalformedInput(CodingErrorAction.IGNORE);
+            decoder.decode(buffer, charBuffer, true);
+            decoder.flush(charBuffer);
+            return new String(charBuffer.array(), 0, charBuffer.position());
+        }
+
     }
 
 }

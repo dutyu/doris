@@ -94,6 +94,50 @@ public class DebugUtil {
         return builder.toString();
     }
 
+    public static long convertPrettyStringToMs(String prettyString) {
+        if (prettyString == null) {
+            throw new IllegalArgumentException("Not valid prettyString: null");
+        }
+        if ("0".equals(prettyString)) {
+            return 0L;
+        }
+
+        long totalMs = 0L;
+        int index = 0;
+        StringBuilder number = new StringBuilder();
+
+        while (index < prettyString.length()) {
+            char currentChar = prettyString.charAt(index++);
+            if (currentChar >= '0' && currentChar <= '9') {
+                number.append(currentChar);
+            } else {
+                if (number.length() == 0) {
+                    throw new IllegalArgumentException("Not valid prettyString: " + prettyString);
+                }
+                switch (currentChar) {
+                    case 'h':
+                        totalMs += Long.parseLong(number.toString()) * HOUR;
+                        break;
+                    case 'm':
+                        // timeunit may be m or ms
+                        if (index == prettyString.length() || prettyString.charAt(index) != 's') {
+                            totalMs += Long.parseLong(number.toString()) * MINUTE;
+                        } else {
+                            totalMs += Long.parseLong(number.toString());
+                        }
+                        break;
+                    case 's':
+                        totalMs += Long.parseLong(number.toString()) * SECOND;
+                        break;
+                    default:
+                        throw new IllegalArgumentException("Not valid prettyString: " + prettyString);
+                }
+                number = new StringBuilder();
+            }
+        }
+        return totalMs;
+    }
+
     public static Pair<Double, String> getByteUint(long value) {
         Double doubleValue = Double.valueOf(value);
         String unit = "";

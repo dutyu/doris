@@ -32,7 +32,7 @@ import java.util.Calendar;
 
 public class DorisStreamLoader {
     private final static Logger LOG = LogManager.getLogger(DorisStreamLoader.class);
-    private static String loadUrlPattern = "http://%s/api/%s/%s/_stream_load?";
+    private final static String loadUrlPattern = "http://%s/api/%s/%s/_stream_load?";
     private String hostPort;
     private String db;
     private String profileLogTbl;
@@ -65,10 +65,11 @@ public class DorisStreamLoader {
         conn.addRequestProperty("Expect", "100-continue");
         conn.addRequestProperty("Content-Type", "text/plain; charset=UTF-8");
         conn.addRequestProperty("label", label);
-        conn.addRequestProperty("line_delimiter", "\\x01");
+        conn.addRequestProperty("line_delimiter", "\\x00");
+        conn.addRequestProperty("column_separator", "\\x01");
         conn.addRequestProperty("max_filter_ratio", "1.0");
         conn.addRequestProperty("columns", "job_id, query_id, user, db, query_type, start_time, " +
-                "end_time, total_time, query_state, trace_id, stmt, profile");
+                "end_time, total_time, total_time_ms, query_state, trace_id, stmt, profile");
 
         conn.setDoOutput(true);
         conn.setDoInput(true);
@@ -82,11 +83,12 @@ public class DorisStreamLoader {
         sb.append("-H \"").append("Authorization\":").append("\"Basic " + authEncoding).append("\" \\\n  ");
         sb.append("-H \"").append("Expect\":").append("\"100-continue\" \\\n  ");
         sb.append("-H \"").append("Content-Type\":").append("\"text/plain; charset=UTF-8\" \\\n  ");
-        sb.append("-H \"").append("line_delimiter\":").append("\"\\x01\" \\\n  ");
+        sb.append("-H \"").append("line_delimiter\":").append("\"\\x00\" \\\n  ");
+        sb.append("-H \"").append("column_separator\":").append("\"\\x01\" \\\n  ");
         sb.append("-H \"").append("max_filter_ratio\":").append("\"1.0\" \\\n  ");
         sb.append("-H \"").append("columns\":")
                 .append("\"job_id, query_id, user, db, query_type, start_time, \" +\n" +
-                "                \"end_time, total_time, query_state, trace_id, stmt, profile\" \\\n  ");
+                "                \"end_time, total_time, total_time_ms, query_state, trace_id, stmt, profile\" \\\n  ");
         sb.append("\"").append(conn.getURL()).append("\"");
         return sb.toString();
     }
