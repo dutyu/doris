@@ -189,24 +189,24 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
             }
         }
 
-        public static final String PROP_MAX_BATCH_SIZE = "max_batch_size";
         public static final String PROP_MAX_BATCH_INTERVAL_SEC = "max_batch_interval_sec";
-        public static final String PROP_MAX_QUEUE_SIZE = "max_queue_size";
         public static final String PROP_FRONTEND_HOST_PORT = "frontend_host_port";
-        public static final String PROP_USER = "user";
-        public static final String PROP_PASSWORD = "password";
-        public static final String PROP_DATABASE = "database";
+        // the max profile length to be loaded in profile table.
+        public static final String PROP_MAX_PROFILE_LENGTH = "max_profile_length";
         public static final String PROP_PROFILE_LOG_TABLE = "profile_log_table";
         // the max stmt length to be loaded in profile table.
         public static final String PROP_MAX_STMT_LENGTH = "max_stmt_length";
-        // the max profile length to be loaded in profile table.
-        public static final String PROP_MAX_PROFILE_LENGTH = "max_profile_length";
-        public static final String PROP_SKIP_STMT = "skip_stmt";
-        public static final String PROP_SKIP_TYPES = "skip_types";
+        public static final String PROP_MAX_BATCH_SIZE = "max_batch_size";
+        public static final String PROP_MAX_QUEUE_SIZE = "max_queue_size";
+        public static final String PROP_SLOW_EXPORT_MS = "slow_export_ms";
+        public static final String PROP_SLOW_INSERT_MS = "slow_insert_ms";
         public static final String PROP_SLOW_QUERY_MS = "slow_query_ms";
         public static final String PROP_SLOW_LOAD_MS = "slow_load_ms";
-        public static final String PROP_SLOW_INSERT_MS = "slow_insert_ms";
-        public static final String PROP_SLOW_EXPORT_MS = "slow_export_ms";
+        public static final String PROP_SKIP_TYPES = "skip_types";
+        public static final String PROP_SKIP_STMT = "skip_stmt";
+        public static final String PROP_PASSWORD = "password";
+        public static final String PROP_DATABASE = "database";
+        public static final String PROP_USER = "user";
 
         public static final Set<String> DEFAULT_SKIP_TYPES = Collections.EMPTY_SET;
 
@@ -221,9 +221,9 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
 
         public static final int DEFAULT_MAX_PROFILE_LENGTH = 81920;
         public static final int DEFAULT_SLOW_EXPORT_MS = 1800000;
-        public static final int DEFAULT_MAX_STMT_LENGTH = 4096;
-        public static final int DEFAULT_SLOW_LOAD_MS = 1800000;
         public static final int DEFAULT_SLOW_INSERT_MS = 1800000;
+        public static final int DEFAULT_SLOW_LOAD_MS = 1800000;
+        public static final int DEFAULT_MAX_STMT_LENGTH = 4096;
         public static final int DEFAULT_MAX_QUEUE_SIZE = 1000;
         public static final int DEFAULT_SLOW_QUERY_MS = 15000;
 
@@ -302,6 +302,7 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
                 case "Export":
                     return event.totalTimeMs >= conf.slowExportMs;
                 default:
+                    // just save all profiles if not in these known types
                     return true;
             }
 
