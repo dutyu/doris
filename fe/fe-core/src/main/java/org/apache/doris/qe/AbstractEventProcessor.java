@@ -113,7 +113,7 @@ public abstract class AbstractEventProcessor<T extends Event> {
 
                     needHandle = !plugins.isEmpty();
                     lastUpdateTime = System.currentTimeMillis();
-                    LOG.debug("update audit plugins. num: {}", plugins.size());
+                    LOG.info("{} update plugins. num: {}", getType().getName(), plugins.size());
                 }
 
                 try {

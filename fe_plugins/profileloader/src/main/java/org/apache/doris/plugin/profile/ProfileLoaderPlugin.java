@@ -178,6 +178,9 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
                 slowLoadMs = properties.containsKey(PROP_SLOW_LOAD_MS) ?
                         Integer.parseInt(properties.get(PROP_SLOW_LOAD_MS)) : DEFAULT_SLOW_LOAD_MS;
 
+                slowInsertMs = properties.containsKey(PROP_SLOW_INSERT_MS) ?
+                    Integer.parseInt(properties.get(PROP_SLOW_INSERT_MS)) : DEFAULT_SLOW_INSERT_MS;
+
                 slowExportMs = properties.containsKey(PROP_SLOW_EXPORT_MS) ?
                         Integer.parseInt(properties.get(PROP_SLOW_EXPORT_MS)) : DEFAULT_SLOW_EXPORT_MS;
 
@@ -202,6 +205,7 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
         public static final String PROP_SKIP_TYPES = "skip_types";
         public static final String PROP_SLOW_QUERY_MS = "slow_query_ms";
         public static final String PROP_SLOW_LOAD_MS = "slow_load_ms";
+        public static final String PROP_SLOW_INSERT_MS = "slow_insert_ms";
         public static final String PROP_SLOW_EXPORT_MS = "slow_export_ms";
 
         public static final Set<String> DEFAULT_SKIP_TYPES = Collections.EMPTY_SET;
@@ -219,6 +223,7 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
         public static final int DEFAULT_SLOW_EXPORT_MS = 1800000;
         public static final int DEFAULT_MAX_STMT_LENGTH = 4096;
         public static final int DEFAULT_SLOW_LOAD_MS = 1800000;
+        public static final int DEFAULT_SLOW_INSERT_MS = 1800000;
         public static final int DEFAULT_MAX_QUEUE_SIZE = 1000;
         public static final int DEFAULT_SLOW_QUERY_MS = 15000;
 
@@ -240,6 +245,7 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
         public final int maxProfileLength;
         public final int slowQueryMs;
         public final int slowLoadMs;
+        public final int slowInsertMs;
         public final int slowExportMs;
 
     }
@@ -291,6 +297,8 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
                     return event.totalTimeMs >= conf.slowQueryMs;
                 case "Load":
                     return event.totalTimeMs >= conf.slowLoadMs;
+                case "Insert":
+                    return event.totalTimeMs >= conf.slowInsertMs;
                 case "Export":
                     return event.totalTimeMs >= conf.slowExportMs;
                 default:

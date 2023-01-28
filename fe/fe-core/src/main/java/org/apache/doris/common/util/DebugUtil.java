@@ -55,7 +55,7 @@ public class DebugUtil {
             unit = "K";
             doubleValue /= THOUSAND;
         }
-        Pair<Double, String> returnValue  = Pair.of(doubleValue, unit);
+        Pair<Double, String> returnValue = Pair.of(doubleValue, unit);
         return returnValue;
     }
 
@@ -120,10 +120,16 @@ public class DebugUtil {
                         break;
                     case 'm':
                         // timeunit may be m or ms
-                        if (index == prettyString.length() || prettyString.charAt(index) != 's') {
+                        // if timeunit is ms, ms should at last position
+                        if (index == prettyString.length()) {
                             totalMs += Long.parseLong(number.toString()) * MINUTE;
                         } else {
-                            totalMs += Long.parseLong(number.toString());
+                            if (prettyString.charAt(index) != 's') {
+                                totalMs += Long.parseLong(number.toString()) * MINUTE;
+                            } else {
+                                totalMs += Long.parseLong(number.toString());
+                                index++;
+                            }
                         }
                         break;
                     case 's':
@@ -153,20 +159,20 @@ public class DebugUtil {
         } else if (value > MEGABYTE) {
             unit = "MB";
             doubleValue /= MEGABYTE;
-        } else if (value > KILOBYTE)  {
+        } else if (value > KILOBYTE) {
             unit = "KB";
             doubleValue /= KILOBYTE;
         } else {
             unit = "B";
         }
-        Pair<Double, String> returnValue  = Pair.of(doubleValue, unit);
+        Pair<Double, String> returnValue = Pair.of(doubleValue, unit);
         return returnValue;
     }
 
     public static String printByteWithUnit(long value) {
         Pair<Double, String> quotaUnitPair = getByteUint(value);
         String readableQuota = DebugUtil.DECIMAL_FORMAT_SCALE_3.format(quotaUnitPair.first) + " "
-                + quotaUnitPair.second;
+            + quotaUnitPair.second;
         return readableQuota;
     }
 
