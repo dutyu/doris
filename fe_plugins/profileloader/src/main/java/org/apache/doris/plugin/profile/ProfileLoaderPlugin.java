@@ -18,7 +18,6 @@
 package org.apache.doris.plugin.profile;
 
 
-import org.apache.doris.common.util.DebugUtil;
 import org.apache.doris.plugin.Plugin;
 import org.apache.doris.plugin.PluginContext;
 import org.apache.doris.plugin.PluginException;
@@ -137,6 +136,7 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
         public ProfileLoaderConf(Map<String, String> properties, String feIdentity) throws PluginException {
             try {
                 this.feIdentity = feIdentity;
+
                 maxBatchSize = properties.containsKey(PROP_MAX_BATCH_SIZE) ?
                         Long.valueOf(properties.get(PROP_MAX_BATCH_SIZE)) : DEFAULT_MAX_BATCH_SIZE;
 
@@ -204,21 +204,25 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
         public static final String PROP_SLOW_LOAD_MS = "slow_load_ms";
         public static final String PROP_SLOW_EXPORT_MS = "slow_export_ms";
 
-        public static final long DEFAULT_MAX_BATCH_SIZE = 50 * 1024 * 1024;
-        public static final long DEFAULT_MAX_BATCH_INTERVAL_SEC = 60;
-        public static final int DEFAULT_MAX_QUEUE_SIZE = 1000;
+        public static final Set<String> DEFAULT_SKIP_TYPES = Collections.EMPTY_SET;
+
+        public static final String DEFAULT_PROFILE_LOG_TABLE = "doris_profile_log_tbl__";
         public static final String DEFAULT_FRONTEND_HOST_PORT = "127.0.0.1:8030";
+        public static final String DEFAULT_DATABASE = "doris_audit_db__";
         public static final String DEFAULT_USER = "root";
         public static final String DEFAULT_PASSWORD = "";
-        public static final String DEFAULT_DATABASE = "doris_audit_db__";
-        public static final String DEFAULT_PROFILE_LOG_TABLE = "doris_profile_log_tbl__";
-        public static final boolean DEFAULT_SKIP_STMT = true;
-        public static final Set<String> DEFAULT_SKIP_TYPES = Collections.EMPTY_SET;
-        public static final int DEFAULT_MAX_STMT_LENGTH = 4096;
+
+        public static final long DEFAULT_MAX_BATCH_SIZE = 50 * 1024 * 1024;
+        public static final long DEFAULT_MAX_BATCH_INTERVAL_SEC = 60;
+
         public static final int DEFAULT_MAX_PROFILE_LENGTH = 81920;
-        public static final int DEFAULT_SLOW_QUERY_MS = 15000;
-        public static final int DEFAULT_SLOW_LOAD_MS = 1800000;
         public static final int DEFAULT_SLOW_EXPORT_MS = 1800000;
+        public static final int DEFAULT_MAX_STMT_LENGTH = 4096;
+        public static final int DEFAULT_SLOW_LOAD_MS = 1800000;
+        public static final int DEFAULT_MAX_QUEUE_SIZE = 1000;
+        public static final int DEFAULT_SLOW_QUERY_MS = 15000;
+
+        public static final boolean DEFAULT_SKIP_STMT = true;
 
         public final long maxBatchSize;
         public final long maxBatchIntervalSec;
@@ -257,13 +261,17 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
                 try {
                     ProfileEvent event = profileEventQueue.poll(5, TimeUnit.SECONDS);
                     if (event != null) {
+
                         if (!filterEvent(event)) {
                             continue;
                         }
+
                         fillLogBuffer(event, profileLogBuffer);
+
                         if (loadIfNecessary(profileLogBuffer)) {
                             profileLogBuffer = new StringBuilder();
                         }
+
                     }
                 } catch (InterruptedException ie) {
                     LOG.debug("Encounter exception when loading current profile batch", ie);
@@ -274,28 +282,21 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
         }
 
         private boolean filterEvent(ProfileEvent event) {
-            if (conf.skipTypes.contains(event.queryType)) {
+            if (conf.skipTypes.contains(event.profileType)) {
                 return false;
             }
 
-            long totalTimeMs = -1L;
-            try {
-                totalTimeMs = DebugUtil.convertPrettyStringToMs(event.totalTime);
-                event.totalTimeMs = totalTimeMs;
-            } catch (Exception e) {
-                LOG.debug("Format of totalTime is not right, totalTime: " + event.totalTime, e);
-            }
-
-            switch (event.queryType) {
+            switch (event.profileType) {
                 case "Query":
-                    return totalTimeMs >= conf.slowQueryMs;
+                    return event.totalTimeMs >= conf.slowQueryMs;
                 case "Load":
-                    return totalTimeMs >= conf.slowLoadMs;
+                    return event.totalTimeMs >= conf.slowLoadMs;
                 case "Export":
-                    return totalTimeMs >= conf.slowExportMs;
+                    return event.totalTimeMs >= conf.slowExportMs;
                 default:
                     return true;
             }
+
         }
 
         private boolean loadIfNecessary(StringBuilder logBuffer) {
@@ -315,6 +316,7 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
                 }
                 return true;
             }
+
             return false;
         }
 
@@ -323,7 +325,7 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
             logBuffer.append(event.queryId).append(COLUMN_SEPARATOR);
             logBuffer.append(event.user).append(COLUMN_SEPARATOR);
             logBuffer.append(event.defaultDb).append(COLUMN_SEPARATOR);
-            logBuffer.append(event.queryType).append(COLUMN_SEPARATOR);
+            logBuffer.append(event.profileType).append(COLUMN_SEPARATOR);
             logBuffer.append(event.startTime).append(COLUMN_SEPARATOR);
             logBuffer.append(event.endTime).append(COLUMN_SEPARATOR);
             logBuffer.append(event.totalTime).append(COLUMN_SEPARATOR);

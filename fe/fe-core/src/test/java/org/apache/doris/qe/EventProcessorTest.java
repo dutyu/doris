@@ -132,7 +132,7 @@ public class EventProcessorTest {
                     .setDefaultDb("default:test_db")
                     .setStartTime("2023-01-19 17:11:00")
                     .setEndTime("2023-01-19 17:12:00")
-                    .setQueryType("Query")
+                    .setProfileType("Query")
                     .setQueryState("N/A")
                     .setTraceId("test_trace_id")
                     .setTotalTime("1m")

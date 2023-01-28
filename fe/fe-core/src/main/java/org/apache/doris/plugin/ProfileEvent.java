@@ -24,11 +24,10 @@ public class ProfileEvent extends Event {
     public String user = "";
     public String defaultDb = "";
     public String stmt = "";
-    public String queryType = "";
+    public String profileType = "";
     public String startTime = "";
     public String endTime = "";
     public String totalTime = "";
-    // worker thread of profile plugin will calculate this field
     public long totalTimeMs = -1L;
     public String queryState = "";
     public String traceId = "";
@@ -69,8 +68,8 @@ public class ProfileEvent extends Event {
             return this;
         }
 
-        public ProfileEventBuilder setQueryType(String queryType) {
-            profileEvent.queryType = queryType;
+        public ProfileEventBuilder setProfileType(String profileType) {
+            profileEvent.profileType = profileType;
             return this;
         }
 
@@ -84,8 +83,13 @@ public class ProfileEvent extends Event {
             return this;
         }
 
-        public ProfileEventBuilder setTotalTime(String totalTimeMs) {
-            profileEvent.totalTime = totalTimeMs;
+        public ProfileEventBuilder setTotalTime(String totalTime) {
+            profileEvent.totalTime = totalTime;
+            return this;
+        }
+
+        public ProfileEventBuilder setTotalTimeMS(long totalTimeMs) {
+            profileEvent.totalTimeMs = totalTimeMs;
             return this;
         }
 

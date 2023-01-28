@@ -357,12 +357,21 @@ public class ProfileManager {
         builder.setUser(element.infoStrings.getOrDefault(USER, ""));
         builder.setDefaultDb(element.infoStrings.getOrDefault(DEFAULT_DB, ""));
         builder.setStmt(element.infoStrings.getOrDefault(SQL_STATEMENT, ""));
-        builder.setQueryType(element.infoStrings.getOrDefault(QUERY_TYPE, ""));
+        builder.setProfileType(element.infoStrings.getOrDefault(QUERY_TYPE, ""));
         builder.setStartTime(element.infoStrings.getOrDefault(START_TIME, ""));
         builder.setEndTime(element.infoStrings.getOrDefault(END_TIME, ""));
         builder.setQueryState(element.infoStrings.getOrDefault(QUERY_STATE, ""));
-        builder.setTotalTime(element.infoStrings.getOrDefault(TOTAL_TIME, ""));
         builder.setProfile(element.profileContent);
+
+        String totalTime = element.infoStrings.getOrDefault(TOTAL_TIME, "");
+        builder.setTotalTime(totalTime);
+        try {
+            long totalTimeMS = DebugUtil.convertPrettyStringToMs(totalTime);
+            builder.setTotalTimeMS(totalTimeMS);
+        } catch (Exception e) {
+            LOG.debug("Convert totalTime failed, totalTime: " + totalTime, e);
+        }
+
         return builder.build();
     }
 }
