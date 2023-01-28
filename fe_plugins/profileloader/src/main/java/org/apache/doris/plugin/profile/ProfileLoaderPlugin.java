@@ -179,7 +179,7 @@ public class ProfileLoaderPlugin extends Plugin implements ProfilePlugin {
                         Integer.parseInt(properties.get(PROP_SLOW_LOAD_MS)) : DEFAULT_SLOW_LOAD_MS;
 
                 slowInsertMs = properties.containsKey(PROP_SLOW_INSERT_MS) ?
-                    Integer.parseInt(properties.get(PROP_SLOW_INSERT_MS)) : DEFAULT_SLOW_INSERT_MS;
+                        Integer.parseInt(properties.get(PROP_SLOW_INSERT_MS)) : DEFAULT_SLOW_INSERT_MS;
 
                 slowExportMs = properties.containsKey(PROP_SLOW_EXPORT_MS) ?
                         Integer.parseInt(properties.get(PROP_SLOW_EXPORT_MS)) : DEFAULT_SLOW_EXPORT_MS;

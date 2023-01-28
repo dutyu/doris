@@ -172,7 +172,7 @@ public class DebugUtil {
     public static String printByteWithUnit(long value) {
         Pair<Double, String> quotaUnitPair = getByteUint(value);
         String readableQuota = DebugUtil.DECIMAL_FORMAT_SCALE_3.format(quotaUnitPair.first) + " "
-            + quotaUnitPair.second;
+                + quotaUnitPair.second;
         return readableQuota;
     }
 
