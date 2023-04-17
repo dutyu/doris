@@ -253,6 +253,14 @@ public class HMSExternalTable extends ExternalTable {
         }
     }
 
+    public String getViewExpandedText() {
+        return remoteTable.getViewExpandedText();
+    }
+
+    public String getViewOriginalText() {
+        return remoteTable.getViewOriginalText();
+    }
+
     public String getMetastoreUri() {
         return ((HMSExternalCatalog) catalog).getHiveMetastoreUris();
     }

@@ -801,11 +801,19 @@ public class Analyzer {
 
         // Now hms table only support a bit of table kinds in the whole hive system.
         // So Add this strong checker here to avoid some undefine behaviour in doris.
-        if (table.getType() == TableType.HMS_EXTERNAL_TABLE && !((HMSExternalTable) table).isSupportedHmsTable()) {
-            ErrorReport.reportAnalysisException(ErrorCode.ERR_NONSUPPORT_HMS_TABLE,
+        if (table.getType() == TableType.HMS_EXTERNAL_TABLE) {
+            if (!((HMSExternalTable) table).isSupportedHmsTable()) {
+                ErrorReport.reportAnalysisException(ErrorCode.ERR_NONSUPPORT_HMS_TABLE,
                     table.getName(),
                     ((HMSExternalTable) table).getDbName(),
                     tableName.getCtl());
+            }
+            if (((HMSExternalTable) table).isView()) {
+                View hmsView = new View(table.getId(), table.getName(), table.getFullSchema());
+                hmsView.setInlineViewDefWithSqlMode(((HMSExternalTable) table).getViewExpandedText(),
+                        ConnectContext.get().getSessionVariable().getSqlMode());
+                return new InlineViewRef(hmsView, tableRef);
+            }
         }
 
         // tableName.getTbl() stores the table name specified by the user in the from statement.
