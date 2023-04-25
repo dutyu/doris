@@ -618,7 +618,8 @@ public class CatalogMgr implements Writable, GsonPostProcessable {
 
         TableIf table = db.getTableNullable(tableName);
         if (table == null) {
-            throw new DdlException("Table " + tableName + " does not exist in db " + dbName);
+            LOG.warn("No table found with table name:[{}], it may have been dropped.", tableName);
+            return;
         }
         ExternalObjectLog log = new ExternalObjectLog();
         log.setCatalogId(catalog.getId());
@@ -683,7 +684,8 @@ public class CatalogMgr implements Writable, GsonPostProcessable {
 
         TableIf table = db.getTableNullable(tableName);
         if (table != null) {
-            throw new DdlException("Table " + tableName + " has exist in db " + dbName);
+            LOG.warn("Table has exist in db with table name:[{}], it may have been dropped.", tableName);
+            return;
         }
         ExternalObjectLog log = new ExternalObjectLog();
         log.setCatalogId(catalog.getId());

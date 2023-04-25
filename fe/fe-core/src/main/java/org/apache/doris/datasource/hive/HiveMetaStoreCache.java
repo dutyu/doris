@@ -382,10 +382,15 @@ public class HiveMetaStoreCache {
              * so we need to invalidate it if this is a non-partitioned table.
              *
              * */
-            Table table = catalog.getClient().getTable(dbName, tblName);
-            // we just need to assign the `location` filed because the `equals` method of `FileCacheKey`
-            // just compares the value of `location`
-            fileCache.invalidate(new FileCacheKey(table.getSd().getLocation(), null));
+            try {
+                Table table = catalog.getClient().getTable(dbName, tblName);
+                // we just need to assign the `location` filed because the `equals` method of `FileCacheKey`
+                // just compares the value of `location`
+                fileCache.invalidate(new FileCacheKey(table.getSd().getLocation(), null));
+            } catch (Exception e) {
+                LOG.warn("invalid table cache for {}.{} in catalog {} failed.",
+                        dbName, tblName, catalog.getName(), e);
+            }
         }
     }
 
