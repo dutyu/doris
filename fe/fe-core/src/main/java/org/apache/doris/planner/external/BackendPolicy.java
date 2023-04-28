@@ -33,6 +33,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class BackendPolicy {
     private static final Logger LOG = LogManager.getLogger(BackendPolicy.class);
@@ -57,12 +58,16 @@ public class BackendPolicy {
                 .needQueryAvailable()
                 .needLoadAvailable()
                 .addTags(tags)
-                .preferComputeNode(Config.prefer_compute_node_for_external_table)
+                .preferComputeNode()
                 .assignExpectBeNum(Config.min_backend_num_for_external_table)
                 .build();
         backends.addAll(policy.getCandidateBackends(Env.getCurrentSystemInfo().getIdToBackend().values()));
         if (backends.isEmpty()) {
             throw new UserException("No available backends");
+        }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("After candidateBackends, backends size: [{}], backends: [{}]", backends.size(),
+                    backends.stream().map(be -> be.getHost()).collect(Collectors.joining(",")));
         }
     }
 

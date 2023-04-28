@@ -17,6 +17,9 @@
 
 package org.apache.doris.system;
 
+import org.apache.doris.catalog.Env;
+import org.apache.doris.common.FeMetaVersion;
+import org.apache.doris.common.io.Text;
 import org.apache.doris.common.io.Writable;
 import org.apache.doris.resource.Tag;
 
@@ -124,6 +127,7 @@ public class BackendHbResponse extends HeartbeatResponse implements Writable {
         out.writeInt(bePort);
         out.writeInt(httpPort);
         out.writeInt(brpcPort);
+        Text.writeString(out, nodeRole);
     }
 
     @Override
@@ -133,6 +137,9 @@ public class BackendHbResponse extends HeartbeatResponse implements Writable {
         bePort = in.readInt();
         httpPort = in.readInt();
         brpcPort = in.readInt();
+        if (Env.getCurrentEnvJournalVersion() >= FeMetaVersion.VERSION_121) {
+            nodeRole = Text.readString(in);
+        }
     }
 
     @Override
@@ -144,6 +151,7 @@ public class BackendHbResponse extends HeartbeatResponse implements Writable {
         sb.append(", bePort: ").append(bePort);
         sb.append(", httpPort: ").append(httpPort);
         sb.append(", brpcPort: ").append(brpcPort);
+        sb.append(", nodeRole: ").append(nodeRole);
         return sb.toString();
     }
 

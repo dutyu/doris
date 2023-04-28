@@ -22,6 +22,8 @@ import org.apache.doris.thrift.TStorageMedium;
 
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.Sets;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -33,6 +35,8 @@ import java.util.stream.Collectors;
  * Selection policy for building BE nodes
  */
 public class BeSelectionPolicy {
+    private static final Logger LOG = LogManager.getLogger(BeSelectionPolicy.class);
+
     public String cluster = SystemInfoService.DEFAULT_CLUSTER;
     public boolean needScheduleAvailable = false;
     public boolean needQueryAvailable = false;
@@ -100,8 +104,8 @@ public class BeSelectionPolicy {
             return this;
         }
 
-        public Builder preferComputeNode(boolean prefer) {
-            policy.preferComputeNode = prefer;
+        public Builder preferComputeNode() {
+            policy.preferComputeNode = true;
             return this;
         }
 
@@ -118,6 +122,8 @@ public class BeSelectionPolicy {
     private boolean isMatch(Backend backend) {
         // Compute node is only used when preferComputeNode is set.
         if (!preferComputeNode && backend.isComputeNode()) {
+            LOG.debug("Backend [{}] is not match by preferComputeNode rule, preferComputeNode: [{}]",
+                    backend.getHost(), preferComputeNode);
             return false;
         }
 
@@ -125,27 +131,38 @@ public class BeSelectionPolicy {
                 || needLoadAvailable && !backend.isLoadAvailable() || !resourceTags.isEmpty() && !resourceTags.contains(
                 backend.getLocationTag()) || storageMedium != null && !backend.hasSpecifiedStorageMedium(
                 storageMedium)) {
+            LOG.debug("Backend [{}] is not match by available rule", backend.getHost());
             return false;
         }
 
         if (checkDiskUsage) {
             if (storageMedium == null && backend.diskExceedLimit()) {
+                LOG.debug("Backend [{}] is not match by diskExceedLimit rule", backend.getHost());
                 return false;
             }
             if (storageMedium != null && backend.diskExceedLimitByStorageMedium(storageMedium)) {
+                LOG.debug("Backend [{}] is not match by diskExceedLimitByStorageMedium rule", backend.getHost());
                 return false;
             }
         }
+        LOG.debug("Backend [{}] is match", backend.getHost());
         return true;
     }
 
     public List<Backend> getCandidateBackends(ImmutableCollection<Backend> backends) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Before candidate, backends size: [{}], backends: [{}]", backends.size(),
+                    backends.stream().map(be -> be.getHost()).collect(Collectors.joining(",")));
+        }
         List<Backend> filterBackends = backends.stream().filter(this::isMatch).collect(Collectors.toList());
         List<Backend> candidates = new ArrayList<>();
+        LOG.debug("After filter, PreferComputeNode: [{}], ExpectBeNum: [{}]", preferComputeNode, expectBeNum);
         if (preferComputeNode) {
             int num = 0;
             // pick compute node first
             for (Backend backend : filterBackends) {
+                LOG.debug("Try pick compute backend, Backend: [{}], isComputeNode: [{}]",
+                        backend.getHost(), backend.isComputeNode());
                 if (backend.isComputeNode()) {
                     candidates.add(backend);
                     num++;
