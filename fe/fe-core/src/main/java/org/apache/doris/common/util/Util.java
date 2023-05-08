@@ -525,6 +525,8 @@ public class Util {
             return TFileFormatType.FORMAT_CSV_LZ4FRAME;
         } else if (lowerCasePath.endsWith(".lzo")) {
             return TFileFormatType.FORMAT_CSV_LZOP;
+        } else if (lowerCasePath.endsWith(".lzo_deflate")) {
+            return TFileFormatType.FORMAT_CSV_LZO;
         } else if (lowerCasePath.endsWith(".deflate")) {
             return TFileFormatType.FORMAT_CSV_DEFLATE;
         } else {

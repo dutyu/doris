@@ -72,9 +72,16 @@ public abstract class QueryScanProvider implements FileScanProviderIf {
             InputSplit inputSplit = inputSplits.get(0);
             TFileType locationType = getLocationType();
             context.params.setFileType(locationType);
-            TFileFormatType fileFormatType = getFileFormatType();
-            context.params.setFormatType(getFileFormatType());
-            if (fileFormatType == TFileFormatType.FORMAT_CSV_PLAIN || fileFormatType == TFileFormatType.FORMAT_JSON) {
+            TFileFormatType fileFormatType = getFileFormatType(inputSplit);
+            context.params.setFormatType(fileFormatType);
+            if (fileFormatType == TFileFormatType.FORMAT_CSV_PLAIN
+                    || fileFormatType == TFileFormatType.FORMAT_CSV_BZ2
+                    || fileFormatType == TFileFormatType.FORMAT_CSV_LZ4FRAME
+                    || fileFormatType == TFileFormatType.FORMAT_CSV_GZ
+                    || fileFormatType == TFileFormatType.FORMAT_CSV_LZO
+                    || fileFormatType == TFileFormatType.FORMAT_CSV_LZOP
+                    || fileFormatType == TFileFormatType.FORMAT_CSV_DEFLATE
+                    || fileFormatType == TFileFormatType.FORMAT_JSON) {
                 context.params.setFileAttributes(getFileAttributes());
             }
 

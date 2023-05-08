@@ -23,6 +23,7 @@ import org.apache.doris.common.DdlException;
 import org.apache.doris.common.MetaNotFoundException;
 import org.apache.doris.planner.ColumnRange;
 import org.apache.doris.thrift.TFileFormatType;
+import org.apache.hadoop.mapred.InputSplit;
 
 import java.util.Collections;
 import java.util.List;
@@ -40,7 +41,7 @@ public class HudiScanProvider extends HiveScanProvider {
     }
 
     @Override
-    public TFileFormatType getFileFormatType() throws DdlException {
+    public TFileFormatType getFileFormatType(InputSplit inputSplit) throws DdlException {
         return TFileFormatType.FORMAT_PARQUET;
     }
 

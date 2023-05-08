@@ -58,7 +58,7 @@ public class BackendPolicy {
                 .needQueryAvailable()
                 .needLoadAvailable()
                 .addTags(tags)
-                .preferComputeNode()
+                .preferComputeNode(Config.prefer_compute_node_for_external_table)
                 .assignExpectBeNum(Config.min_backend_num_for_external_table)
                 .build();
         backends.addAll(policy.getCandidateBackends(Env.getCurrentSystemInfo().getIdToBackend().values()));

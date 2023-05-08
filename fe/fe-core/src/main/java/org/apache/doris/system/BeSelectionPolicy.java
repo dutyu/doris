@@ -104,8 +104,8 @@ public class BeSelectionPolicy {
             return this;
         }
 
-        public Builder preferComputeNode() {
-            policy.preferComputeNode = true;
+        public Builder preferComputeNode(boolean preferComputeNode) {
+            policy.preferComputeNode = preferComputeNode;
             return this;
         }
 

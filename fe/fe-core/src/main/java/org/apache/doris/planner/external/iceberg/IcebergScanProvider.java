@@ -237,7 +237,7 @@ public class IcebergScanProvider extends QueryScanProvider {
     }
 
     @Override
-    public TFileFormatType getFileFormatType() throws DdlException, MetaNotFoundException {
+    public TFileFormatType getFileFormatType(InputSplit inputSplit) throws DdlException, MetaNotFoundException {
         TFileFormatType type;
         String icebergFormat = icebergSource.getFileFormat();
         if (icebergFormat.equalsIgnoreCase("parquet")) {

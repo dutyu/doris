@@ -71,7 +71,7 @@ public class TVFScanProvider extends QueryScanProvider {
 
     // =========== implement interface methods of FileScanProviderIf ================
     @Override
-    public TFileFormatType getFileFormatType() throws DdlException, MetaNotFoundException {
+    public TFileFormatType getFileFormatType(InputSplit inputSplit) throws DdlException, MetaNotFoundException {
         return tableValuedFunction.getTFileFormatType();
     }
 

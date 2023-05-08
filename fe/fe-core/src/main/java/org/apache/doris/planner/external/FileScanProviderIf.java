@@ -36,7 +36,7 @@ import java.util.Map;
 
 public interface FileScanProviderIf {
     // Return parquet/orc/text, etc.
-    TFileFormatType getFileFormatType() throws DdlException, MetaNotFoundException;
+    TFileFormatType getFileFormatType(InputSplit inputSplit) throws DdlException, MetaNotFoundException;
 
     // Return S3/HDSF, etc.
     TFileType getLocationType() throws DdlException, MetaNotFoundException;

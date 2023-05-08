@@ -33,6 +33,7 @@ import org.apache.doris.common.DdlException;
 import org.apache.doris.common.FeConstants;
 import org.apache.doris.common.MetaNotFoundException;
 import org.apache.doris.common.UserException;
+import org.apache.doris.common.util.PrintableMap;
 import org.apache.doris.common.util.Util;
 import org.apache.doris.datasource.HMSExternalCatalog;
 import org.apache.doris.datasource.hive.HiveMetaStoreCache;
@@ -50,9 +51,11 @@ import org.apache.doris.thrift.TFileTextScanRangeParams;
 import org.apache.doris.thrift.TFileType;
 
 import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
@@ -94,9 +97,15 @@ public class HiveScanProvider extends HMSTableScanProvider {
     }
 
     @Override
-    public TFileFormatType getFileFormatType() throws DdlException, MetaNotFoundException {
+    public TFileFormatType getFileFormatType(InputSplit inputSplit) throws DdlException, MetaNotFoundException {
         TFileFormatType type = null;
-        String inputFormatName = getRemoteHiveTable().getSd().getInputFormat();
+        StorageDescriptor sd = getRemoteHiveTable().getSd();
+        String inputFormatName = sd.getInputFormat();
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Hive location: {}, input format: {}, is compressed: {}, parameters: {}",
+                sd.getLocation(), inputFormatName, sd.isCompressed(),
+                new PrintableMap<>(sd.getParameters(), ":", true, false));
+        }
         String hiveFormat = HiveMetaStoreClientHelper.HiveFileFormat.getFormat(inputFormatName);
         if (hiveFormat.equals(HiveMetaStoreClientHelper.HiveFileFormat.PARQUET.getDesc())) {
             type = TFileFormatType.FORMAT_PARQUET;
@@ -104,6 +113,9 @@ public class HiveScanProvider extends HMSTableScanProvider {
             type = TFileFormatType.FORMAT_ORC;
         } else if (hiveFormat.equals(HiveMetaStoreClientHelper.HiveFileFormat.TEXT_FILE.getDesc())) {
             type = TFileFormatType.FORMAT_CSV_PLAIN;
+            if (inputSplit instanceof FileSplit) {
+                type = Util.getFileFormatType(((FileSplit) inputSplit).getPath().toUri().getPath());
+            }
         }
         return type;
     }
