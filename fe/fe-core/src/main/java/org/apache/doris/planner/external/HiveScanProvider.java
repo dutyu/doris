@@ -101,11 +101,6 @@ public class HiveScanProvider extends HMSTableScanProvider {
         TFileFormatType type = null;
         StorageDescriptor sd = getRemoteHiveTable().getSd();
         String inputFormatName = sd.getInputFormat();
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Hive location: {}, input format: {}, is compressed: {}, parameters: {}",
-                sd.getLocation(), inputFormatName, sd.isCompressed(),
-                new PrintableMap<>(sd.getParameters(), ":", true, false));
-        }
         String hiveFormat = HiveMetaStoreClientHelper.HiveFileFormat.getFormat(inputFormatName);
         if (hiveFormat.equals(HiveMetaStoreClientHelper.HiveFileFormat.PARQUET.getDesc())) {
             type = TFileFormatType.FORMAT_PARQUET;

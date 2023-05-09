@@ -17,6 +17,7 @@
 
 package org.apache.doris.planner.external;
 
+import com.clearspring.analytics.util.Lists;
 import org.apache.doris.catalog.Env;
 import org.apache.doris.catalog.FsBroker;
 import org.apache.doris.catalog.HdfsResource;
@@ -24,6 +25,7 @@ import org.apache.doris.common.DdlException;
 import org.apache.doris.common.MetaNotFoundException;
 import org.apache.doris.common.UserException;
 import org.apache.doris.common.util.BrokerUtil;
+import org.apache.doris.common.util.Util;
 import org.apache.doris.planner.external.ExternalFileScanNode.ParamCreateContext;
 import org.apache.doris.planner.external.iceberg.IcebergScanProvider;
 import org.apache.doris.planner.external.iceberg.IcebergSplit;
@@ -49,8 +51,11 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public abstract class QueryScanProvider implements FileScanProviderIf {
     public static final Logger LOG = LogManager.getLogger(QueryScanProvider.class);
@@ -69,19 +74,14 @@ public abstract class QueryScanProvider implements FileScanProviderIf {
             if (inputSplits.isEmpty()) {
                 return;
             }
-            InputSplit inputSplit = inputSplits.get(0);
             TFileType locationType = getLocationType();
             context.params.setFileType(locationType);
+
+            InputSplit inputSplit = inputSplits.get(0);
             TFileFormatType fileFormatType = getFileFormatType(inputSplit);
             context.params.setFormatType(fileFormatType);
-            if (fileFormatType == TFileFormatType.FORMAT_CSV_PLAIN
-                    || fileFormatType == TFileFormatType.FORMAT_CSV_BZ2
-                    || fileFormatType == TFileFormatType.FORMAT_CSV_LZ4FRAME
-                    || fileFormatType == TFileFormatType.FORMAT_CSV_GZ
-                    || fileFormatType == TFileFormatType.FORMAT_CSV_LZO
-                    || fileFormatType == TFileFormatType.FORMAT_CSV_LZOP
-                    || fileFormatType == TFileFormatType.FORMAT_CSV_DEFLATE
-                    || fileFormatType == TFileFormatType.FORMAT_JSON) {
+            boolean isCsvFormat = Util.isCsvFormat(fileFormatType);
+            if (isCsvFormat || fileFormatType == TFileFormatType.FORMAT_JSON) {
                 context.params.setFileAttributes(getFileAttributes());
             }
 
@@ -113,12 +113,31 @@ public abstract class QueryScanProvider implements FileScanProviderIf {
             } else if (locationType == TFileType.FILE_S3) {
                 context.params.setProperties(locationProperties);
             }
-            TScanRangeLocations curLocations = newLocations(context.params, backendPolicy);
 
-            FileSplitStrategy fileSplitStrategy = new FileSplitStrategy();
+            List<TScanRangeLocations> candidateLocations = Lists.newArrayList();
+            TScanRangeLocations curLocations = newLocations(new TFileScanRangeParams(context.params), backendPolicy);
+            candidateLocations.add(curLocations);
+            FileSplitStrategy fileSplitStrategy = new FileSplitStrategy(fileFormatType);
+
+            Collections.shuffle(inputSplits);
+            if (isCsvFormat && inputSplit instanceof FileSplit) {
+                inputSplits = inputSplits.stream().map(FileSplit.class::cast)
+                        .sorted(Comparator.comparing(
+                                fileSplit -> Util.getFileFormatType(fileSplit.getPath().toString())))
+                        .collect(Collectors.toList());
+            }
 
             for (InputSplit split : inputSplits) {
                 FileSplit fileSplit = (FileSplit) split;
+                TFileFormatType curFileFormatType = getFileFormatType(fileSplit);
+                context.params.setFormatType(curFileFormatType);
+                // Add a new location when it's can be split
+                if (fileSplitStrategy.hasNext(curFileFormatType)) {
+                    curLocations = newLocations(new TFileScanRangeParams(context.params), backendPolicy);
+                    candidateLocations.add(curLocations);
+                    fileSplitStrategy.next(curFileFormatType);
+                }
+
                 List<String> pathPartitionKeys = getPathPartitionKeys();
                 List<String> partitionValuesFromPath = BrokerUtil.parseColumnsFromPath(fileSplit.getPath().toString(),
                         pathPartitionKeys, false);
@@ -136,22 +155,21 @@ public abstract class QueryScanProvider implements FileScanProviderIf {
                 }
 
                 curLocations.getScanRange().getExtScanRange().getFileScanRange().addToRanges(rangeDesc);
-                LOG.debug("assign to backend {} with table split: {} ({}, {}), location: {}",
-                        curLocations.getLocations().get(0).getBackendId(), fileSplit.getPath(), fileSplit.getStart(),
-                        fileSplit.getLength(), Joiner.on("|").join(split.getLocations()));
+                LOG.debug("assign to backend {} with table split: {} ({}, {}, {}), location: {}",
+                        curLocations.getLocations().get(0).getBackendId(), fileSplit.getPath(),
+                        fileSplit.getStart(), fileSplit.getLength(),
+                        curLocations.getScanRange().getExtScanRange().getFileScanRange().params.getFormatType(),
+                        Joiner.on("|").join(split.getLocations()));
 
                 fileSplitStrategy.update(fileSplit);
-                // Add a new location when it's can be split
-                if (fileSplitStrategy.hasNext()) {
-                    scanRangeLocations.add(curLocations);
-                    curLocations = newLocations(context.params, backendPolicy);
-                    fileSplitStrategy.next();
-                }
                 this.inputFileSize += fileSplit.getLength();
             }
-            if (curLocations.getScanRange().getExtScanRange().getFileScanRange().getRangesSize() > 0) {
-                scanRangeLocations.add(curLocations);
-            }
+
+            scanRangeLocations.addAll(
+                candidateLocations.stream().filter(
+                        location -> location.getScanRange().getExtScanRange().getFileScanRange().getRangesSize() > 0)
+                .collect(Collectors.toList())
+            );
             LOG.debug("create #{} ScanRangeLocations cost: {} ms",
                     scanRangeLocations.size(), (System.currentTimeMillis() - start));
         } catch (IOException e) {
@@ -170,6 +188,7 @@ public abstract class QueryScanProvider implements FileScanProviderIf {
     }
 
     private TScanRangeLocations newLocations(TFileScanRangeParams params, BackendPolicy backendPolicy) {
+
         // Generate on file scan range
         TFileScanRange fileScanRange = new TFileScanRange();
         fileScanRange.setParams(params);

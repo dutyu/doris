@@ -17,17 +17,21 @@
 
 package org.apache.doris.planner.external;
 
+import com.google.common.base.Preconditions;
 import org.apache.doris.common.Config;
 
+import org.apache.doris.thrift.TFileFormatType;
 import org.apache.hadoop.mapred.FileSplit;
 
 public class FileSplitStrategy {
     private long totalSplitSize;
     private int splitNum;
-
-    FileSplitStrategy() {
+    private TFileFormatType fileFormatType;
+    FileSplitStrategy(TFileFormatType fileFormatType) {
+        Preconditions.checkNotNull(fileFormatType);
         this.totalSplitSize = 0;
         this.splitNum = 0;
+        this.fileFormatType = fileFormatType;
     }
 
     public void update(FileSplit split) {
@@ -35,12 +39,16 @@ public class FileSplitStrategy {
         splitNum++;
     }
 
-    public boolean hasNext() {
-        return totalSplitSize > Config.file_scan_node_split_size || splitNum > Config.file_scan_node_split_num;
+    public boolean hasNext(TFileFormatType fileFormatType) {
+        return fileFormatType != this.fileFormatType
+                || totalSplitSize > Config.file_scan_node_split_size
+                || splitNum > Config.file_scan_node_split_num;
     }
 
-    public void next() {
+    public void next(TFileFormatType newFileFormatType) {
         totalSplitSize = 0;
         splitNum = 0;
+        fileFormatType = newFileFormatType;
     }
+
 }
