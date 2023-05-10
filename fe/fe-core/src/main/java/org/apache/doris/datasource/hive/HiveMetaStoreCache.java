@@ -228,7 +228,8 @@ public class HiveMetaStoreCache {
                     sd.getInputFormat(), sd.getLocation(), key, catalog.getName());
         }
         // TODO: more info?
-        return new HivePartition(sd.getInputFormat(), sd.getLocation(), key.values);
+        return new HivePartition(key.dbName, key.tblName, false,
+                sd.getInputFormat(), sd.getLocation(), key.values);
     }
 
     private ImmutableList<InputSplit> loadFiles(FileCacheKey key) {
@@ -312,7 +313,11 @@ public class HiveMetaStoreCache {
     public List<InputSplit> getFilesByPartitions(List<HivePartition> partitions) {
         long start = System.currentTimeMillis();
         List<FileCacheKey> keys = Lists.newArrayListWithExpectedSize(partitions.size());
-        partitions.stream().forEach(p -> keys.add(new FileCacheKey(p.getPath(), p.getInputFormat())));
+        partitions.stream().forEach(p -> keys.add(
+                p.isDummyPartition()
+                        ? FileCacheKey.createDummyCacheKey(p.getDbName(), p.getTblName(), p.getPath(), p.getInputFormat())
+                        : new FileCacheKey(p.getPath(), p.getInputFormat())
+        ));
 
         List<ImmutableList<InputSplit>> fileLists = keys.parallelStream().map(k -> {
             try {
@@ -368,17 +373,12 @@ public class HiveMetaStoreCache {
              * A file cache entry can be created reference to
              * {@link org.apache.doris.planner.external.HiveSplitter#getSplits},
              * so we need to invalidate it if this is a non-partitioned table.
-             *
+             * We use {@link org.apache.doris.datasource.hive.HiveMetaStoreCache.FileCacheKey#createDummyCacheKey}
+             * to avoid invocation by Hms Client, because this method may be invoked when salve FE replay journal logs,
+             * and FE will exit if some network problems occur.
              * */
-            try {
-                Table table = catalog.getClient().getTable(dbName, tblName);
-                // we just need to assign the `location` filed because the `equals` method of `FileCacheKey`
-                // just compares the value of `location`
-                fileCache.invalidate(new FileCacheKey(table.getSd().getLocation(), null));
-            } catch (Exception e) {
-                LOG.warn("invalid table cache for {}.{} in catalog {} failed.",
-                        dbName, tblName, catalog.getName(), e);
-            }
+            FileCacheKey fileCacheKey = FileCacheKey.createDummyCacheKey(dbName, tblName, null, null);
+            fileCache.invalidate(fileCacheKey);
         }
     }
 
@@ -601,6 +601,7 @@ public class HiveMetaStoreCache {
 
     @Data
     public static class FileCacheKey {
+        private String dummyKey;
         private String location;
         // not in key
         private String inputFormat;
@@ -608,6 +609,13 @@ public class HiveMetaStoreCache {
         public FileCacheKey(String location, String inputFormat) {
             this.location = location;
             this.inputFormat = inputFormat;
+        }
+
+        public static FileCacheKey createDummyCacheKey(String dbName, String tblName, String location,
+                                                       String inputFormat) {
+            FileCacheKey fileCacheKey = new FileCacheKey(location, inputFormat);
+            fileCacheKey.dummyKey = dbName + "." + tblName;
+            return fileCacheKey;
         }
 
         @Override
@@ -618,11 +626,17 @@ public class HiveMetaStoreCache {
             if (!(obj instanceof FileCacheKey)) {
                 return false;
             }
+            if (dummyKey != null) {
+                return dummyKey.equals(((FileCacheKey) obj).dummyKey);
+            }
             return location.equals(((FileCacheKey) obj).location);
         }
 
         @Override
         public int hashCode() {
+            if (dummyKey != null) {
+                return Objects.hash(dummyKey);
+            }
             return Objects.hash(location);
         }
 
