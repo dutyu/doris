@@ -314,8 +314,7 @@ public class HiveMetaStoreCache {
         List<FileCacheKey> keys = Lists.newArrayListWithExpectedSize(partitions.size());
         partitions.stream().forEach(p -> keys.add(new FileCacheKey(p.getPath(), p.getInputFormat())));
 
-        Stream<FileCacheKey> stream = keys.parallelStream();
-        List<ImmutableList<InputSplit>> fileLists = stream.map(k -> {
+        List<ImmutableList<InputSplit>> fileLists = keys.parallelStream().map(k -> {
             try {
                 return fileCache.get(k);
             } catch (ExecutionException e) {
@@ -335,13 +334,7 @@ public class HiveMetaStoreCache {
         List<PartitionCacheKey> keys = Lists.newArrayListWithExpectedSize(partitionValuesList.size());
         partitionValuesList.stream().forEach(p -> keys.add(new PartitionCacheKey(dbName, name, p)));
 
-        Stream<PartitionCacheKey> stream;
-        if (partitionValuesList.size() < MIN_BATCH_FETCH_PARTITION_NUM) {
-            stream = keys.stream();
-        } else {
-            stream = keys.parallelStream();
-        }
-        List<HivePartition> partitions = stream.map(k -> {
+        List<HivePartition> partitions = keys.parallelStream().map(k -> {
             try {
                 return partitionCache.get(k);
             } catch (ExecutionException e) {
