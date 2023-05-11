@@ -52,7 +52,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
-import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.mapred.FileInputFormat;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.InputSplit;
@@ -72,7 +71,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 // The cache of a hms catalog. 3 kind of caches:
 // 1. partitionValuesCache: cache the partition values of a table, for partition prune.
@@ -417,9 +415,8 @@ public class HiveMetaStoreCache {
     }
 
     // partition name format: nation=cn/city=beijing
-    public void addPartitionsCache(String dbName, String tblName, List<String> partitionNames,
-            List<Type> partitionColumnTypes) {
-        PartitionValueCacheKey key = new PartitionValueCacheKey(dbName, tblName, partitionColumnTypes);
+    public void addPartitionsCache(String dbName, String tblName, List<String> partitionNames) {
+        PartitionValueCacheKey key = new PartitionValueCacheKey(dbName, tblName, null);
         HivePartitionValues partitionValues = partitionValuesCache.getIfPresent(key);
         if (partitionValues == null) {
             return;
@@ -474,8 +471,8 @@ public class HiveMetaStoreCache {
     }
 
     public void dropPartitionsCache(String dbName, String tblName, List<String> partitionNames,
-            List<Type> partitionColumnTypes, boolean invalidPartitionCache) {
-        PartitionValueCacheKey key = new PartitionValueCacheKey(dbName, tblName, partitionColumnTypes);
+            boolean invalidPartitionCache) {
+        PartitionValueCacheKey key = new PartitionValueCacheKey(dbName, tblName, null);
         HivePartitionValues partitionValues = partitionValuesCache.getIfPresent(key);
         if (partitionValues == null) {
             return;
