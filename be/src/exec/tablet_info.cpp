@@ -208,17 +208,22 @@ Status OlapTablePartitionParam::init() {
             _distributed_slot_descs.emplace_back(it->second);
         }
     }
-    if (num_buckets <= 0) {
-        std::stringstream ss;
-        ss << "num_buckets must be greater than 0, num_buckets=" << num_buckets;
-        return Status::InternalError(ss.str());
-    }
     if (_distributed_slot_descs.empty()) {
         _compute_tablet_index = [](Tuple* key, int64_t num_buckets) -> uint32_t {
+            if (num_buckets <= 0) {
+                std::stringstream ss;
+                ss << "num_buckets must be greater than 0, num_buckets=" << num_buckets;
+                return Status::InternalError(ss.str());
+            }
             return butil::fast_rand() % num_buckets;
         };
     } else {
         _compute_tablet_index = [this](Tuple* key, int64_t num_buckets) -> uint32_t {
+            if (num_buckets <= 0) {
+                std::stringstream ss;
+                ss << "num_buckets must be greater than 0, num_buckets=" << num_buckets;
+                return Status::InternalError(ss.str());
+            }
             uint32_t hash_val = 0;
             for (auto slot_desc : _distributed_slot_descs) {
                 void* slot = nullptr;
