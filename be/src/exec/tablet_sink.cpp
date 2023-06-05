@@ -1002,7 +1002,7 @@ Status OlapTableSink::send(RuntimeState* state, RowBatch* input_batch) {
         uint32_t tablet_index = 0;
         if (partition->num_buckets <= 0) {
             std::stringstream ss;
-            ss << "num_buckets must be greater than 0, num_buckets=" << num_buckets;
+            ss << "num_buckets must be greater than 0, num_buckets=" << partition->num_buckets;
             return Status::InternalError(ss.str());
         }
         if (findTabletMode != FindTabletMode::FIND_TABLET_EVERY_ROW) {
