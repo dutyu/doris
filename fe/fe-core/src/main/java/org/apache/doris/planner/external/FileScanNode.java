@@ -27,7 +27,6 @@ import org.apache.doris.catalog.TableIf;
 import org.apache.doris.common.UserException;
 import org.apache.doris.planner.PlanNodeId;
 import org.apache.doris.planner.external.FileSplit.FileSplitCreator;
-import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.spi.Split;
 import org.apache.doris.statistics.StatisticalType;
 import org.apache.doris.thrift.TExplainLevel;
@@ -202,14 +201,19 @@ public abstract class FileScanNode extends ExternalScanNode {
         }
     }
 
-    protected List<Split> splitFile(Path path, long blockSize, long splitSize, BlockLocation[] blockLocations, long length,
-            long modificationTime, boolean splittable, List<String> partitionValues) throws IOException {
-        return splitFile(path, blockSize, splitSize, blockLocations, length, modificationTime, splittable, partitionValues,
+    protected List<Split> splitFile(Path path, long blockSize, long splitSize,
+                                    BlockLocation[] blockLocations, long length,
+                                    long modificationTime, boolean splittable,
+                                    List<String> partitionValues) throws IOException {
+        return splitFile(path, blockSize, splitSize, blockLocations, length,
+                modificationTime, splittable, partitionValues,
                 FileSplitCreator.DEFAULT);
     }
 
-    protected List<Split> splitFile(Path path, long blockSize, long splitSize, BlockLocation[] blockLocations, long length,
-            long modificationTime, boolean splittable, List<String> partitionValues, SplitCreator splitCreator)
+    protected List<Split> splitFile(Path path, long blockSize, long splitSize,
+                                    BlockLocation[] blockLocations, long length,
+                                    long modificationTime, boolean splittable,
+                                    List<String> partitionValues, SplitCreator splitCreator)
             throws IOException {
         if (blockLocations == null) {
             blockLocations = new BlockLocation[0];
