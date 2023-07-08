@@ -92,6 +92,16 @@ public class HiveScanNode extends FileQueryScanNode {
     @Override
     protected void doInitialize() throws UserException {
         super.doInitialize();
+        if (executor == null) {
+            synchronized (HiveScanNode.class) {
+                if (executor == null) {
+                    executor = ThreadPoolManager.newDaemonFixedThreadPool(
+                                Config.max_hive_file_splitter_thread_pool_size,
+                                Config.max_hive_file_splitter_thread_pool_size * 1000,
+                                "HiveFileSplitterPool", 120, true);
+                }
+            }
+        }
         if (HiveVersionUtil.isHive1(hmsTable.getHiveVersion())) {
             genSlotToSchemaIdMap();
         }
