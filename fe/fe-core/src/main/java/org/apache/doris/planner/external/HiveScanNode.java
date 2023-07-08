@@ -196,21 +196,45 @@ public class HiveScanNode extends FileQueryScanNode {
         } else {
             fileCaches = cache.getFilesByPartitions(partitions, useSelfSplitter);
         }
-        for (HiveMetaStoreCache.FileCacheValue fileCacheValue : fileCaches) {
-            // This if branch is to support old splitter, will remove later.
-            if (fileCacheValue.getSplits() != null) {
-                allFiles.addAll(fileCacheValue.getSplits());
-            }
-            if (fileCacheValue.getFiles() != null) {
-                boolean isSplittable = fileCacheValue.isSplittable();
-                for (HiveMetaStoreCache.HiveFileStatus status : fileCacheValue.getFiles()) {
-                    allFiles.addAll(splitFile(status.getPath(), status.getBlockSize(),
-                            status.getBlockLocations(), status.getLength(), status.getModificationTime(),
-                            isSplittable, fileCacheValue.getPartitionValues(),
-                            new HiveSplitCreator(fileCacheValue.getAcidInfo())));
-                }
+
+        Preconditions.checkNotNull(executor);
+        long splitSize = ConnectContext.get().getSessionVariable().getFileSplitSize();
+        List<Future<List<Split>>> futures = fileCaches.stream()
+                    .map(fileCacheValue -> executor.submit(() ->
+                                getFileSplitByFileCache(fileCacheValue, splitSize)))
+                    .collect(Collectors.toList());
+
+        List<Split> fileSplits = Lists.newLinkedList();
+        for (Future<List<Split>> future : futures) {
+            try {
+                fileSplits.addAll(future.get());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
         }
+
+        return fileSplits;
+    }
+
+    private List<Split> getFileSplitByFileCache(HiveMetaStoreCache.FileCacheValue fileCacheValue, long splitSize)
+                throws IOException {
+        // This if branch is to support old splitter, will remove later.
+        List<Split> splits = Lists.newLinkedList();
+        if (fileCacheValue.getSplits() != null) {
+            splits.addAll(fileCacheValue.getSplits());
+        }
+        if (fileCacheValue.getFiles() != null) {
+            boolean isSplittable = fileCacheValue.isSplittable();
+            for (HiveMetaStoreCache.HiveFileStatus status : fileCacheValue.getFiles()) {
+                splits.addAll(
+                        splitFile(status.getPath(), status.getBlockSize(), splitSize,
+                                  status.getBlockLocations(), status.getLength(), status.getModificationTime(),
+                                  isSplittable, fileCacheValue.getPartitionValues(),
+                                  new HiveSplitCreator(fileCacheValue.getAcidInfo()))
+                );
+            }
+        }
+        return ImmutableList.copyOf(splits);
     }
 
     private List<FileCacheValue> getFileSplitByTransaction(HiveMetaStoreCache cache, List<HivePartition> partitions) {
