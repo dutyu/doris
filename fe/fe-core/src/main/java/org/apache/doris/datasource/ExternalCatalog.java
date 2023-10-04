@@ -87,7 +87,9 @@ public abstract class ExternalCatalog
     // save properties of this catalog, such as hive meta store url.
     @SerializedName(value = "catalogProperty")
     protected CatalogProperty catalogProperty;
+    @SerializedName(value = "initialized")
     private boolean initialized = false;
+    @SerializedName(value = "idToDb")
     protected Map<Long, ExternalDatabase<? extends ExternalTable>> idToDb = Maps.newConcurrentMap();
     @SerializedName(value = "lastUpdateTime")
     protected long lastUpdateTime;
@@ -242,10 +244,19 @@ public abstract class ExternalCatalog
             if (!includeDatabaseMap.isEmpty() && !includeDatabaseMap.containsKey(dbName)) {
                 continue;
             }
-            long dbId = Env.getCurrentEnv().getNextExtCtlId();
-            tmpDbNameToId.put(dbName, dbId);
-            ExternalDatabase<? extends ExternalTable> db = getDbForInit(dbName, dbId, logType);
-            tmpIdToDb.put(dbId, db);
+            long dbId;
+            if (dbNameToId != null && dbNameToId.containsKey(dbName)) {
+                dbId = dbNameToId.get(dbName);
+                tmpDbNameToId.put(dbName, dbId);
+                ExternalDatabase<? extends ExternalTable> db = idToDb.get(dbId);
+                db.setUnInitialized(invalidCacheInInit);
+                tmpIdToDb.put(dbId, db);
+            } else {
+                dbId = Env.getCurrentEnv().getNextExtCtlId();
+                tmpDbNameToId.put(dbName, dbId);
+                ExternalDatabase<? extends ExternalTable> db = getDbForInit(dbName, dbId, logType);
+                tmpIdToDb.put(dbId, db);
+            }
         }
         dbNameToId = tmpDbNameToId;
         idToDb = tmpIdToDb;
@@ -413,6 +424,33 @@ public abstract class ExternalCatalog
 
     private void removeAccessController() {
         Env.getCurrentEnv().getAccessManager().removeAccessController(name);
+    }
+
+    public void replayInitCatalog(InitCatalogLog log) {
+        Map<String, Long> tmpDbNameToId = Maps.newConcurrentMap();
+        Map<Long,  ExternalDatabase<? extends ExternalTable>> tmpIdToDb = Maps.newConcurrentMap();
+        for (int i = 0; i < log.getRefreshCount(); i++) {
+            ExternalDatabase<? extends ExternalTable> db = getDbForReplay(log.getRefreshDbIds().get(i));
+            db.setUnInitialized(invalidCacheInInit);
+            tmpDbNameToId.put(db.getFullName(), db.getId());
+            tmpIdToDb.put(db.getId(), db);
+        }
+        for (int i = 0; i < log.getCreateCount(); i++) {
+            ExternalDatabase<? extends ExternalTable> db =
+                    getDbForInit(log.getCreateDbNames().get(i), log.getCreateDbIds().get(i), log.getType());
+            if (db != null) {
+                tmpDbNameToId.put(db.getFullName(), db.getId());
+                tmpIdToDb.put(db.getId(), db);
+            }
+        }
+        dbNameToId = tmpDbNameToId;
+        idToDb = tmpIdToDb;
+        lastUpdateTime = log.getLastUpdateTime();
+        initialized = true;
+    }
+
+    public  ExternalDatabase<? extends ExternalTable> getDbForReplay(long dbId) {
+        return idToDb.get(dbId);
     }
 
     protected ExternalDatabase<? extends ExternalTable> getDbForInit(String dbName, long dbId,

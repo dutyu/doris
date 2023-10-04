@@ -35,6 +35,7 @@ import org.apache.doris.qe.ConnectContext;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.gson.annotations.SerializedName;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -60,13 +61,19 @@ public abstract class ExternalDatabase<T extends ExternalTable>
 
     protected ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock(true);
 
+    @SerializedName(value = "id")
     protected long id;
+    @SerializedName(value = "name")
     protected String name;
+    @SerializedName(value = "dbProperties")
     protected DatabaseProperty dbProperties = new DatabaseProperty();
+    @SerializedName(value = "initialized")
     protected boolean initialized = false;
     // Cache of table name to table id.
     protected Map<String, Long> tableNameToId = Maps.newConcurrentMap();
+    @SerializedName(value = "idToTbl")
     protected Map<Long, T> idToTbl = Maps.newConcurrentMap();
+    @SerializedName(value = "lastUpdateTime")
     protected long lastUpdateTime;
     protected final InitDatabaseLog.Type dbLogType;
     protected ExternalCatalog extCatalog;
@@ -121,10 +128,19 @@ public abstract class ExternalDatabase<T extends ExternalTable>
             Map<String, Long> tmpTableNameToId = Maps.newConcurrentMap();
             Map<Long, T> tmpIdToTbl = Maps.newHashMap();
             for (String tableName : tableNames) {
-                long tblId = Env.getCurrentEnv().getNextExtCtlId();
-                tmpTableNameToId.put(tableName, tblId);
-                T table = getExternalTable(tableName, tblId, extCatalog);
-                tmpIdToTbl.put(tblId, table);
+                long tblId;
+                if (tableNameToId != null && tableNameToId.containsKey(tableName)) {
+                    tblId = tableNameToId.get(tableName);
+                    tmpTableNameToId.put(tableName, tblId);
+                    T table = idToTbl.get(tblId);
+                    table.unsetObjectCreated();
+                    tmpIdToTbl.put(tblId, table);
+                } else {
+                    tblId = Env.getCurrentEnv().getNextExtCtlId();
+                    tmpTableNameToId.put(tableName, tblId);
+                    T table = getExternalTable(tableName, tblId, extCatalog);
+                    tmpIdToTbl.put(tblId, table);
+                }
             }
             tableNameToId = tmpTableNameToId;
             idToTbl = tmpIdToTbl;
@@ -135,6 +151,10 @@ public abstract class ExternalDatabase<T extends ExternalTable>
     }
 
     protected abstract T getExternalTable(String tableName, long tblId, ExternalCatalog catalog);
+
+    public T getTableForReplay(long tableId) {
+        return idToTbl.get(tableId);
+    }
 
     @Override
     public void readLock() {
