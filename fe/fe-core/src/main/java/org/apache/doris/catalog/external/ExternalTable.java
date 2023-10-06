@@ -65,15 +65,10 @@ import java.util.stream.Collectors;
 public class ExternalTable implements TableIf, Writable, GsonPostProcessable {
     private static final Logger LOG = LogManager.getLogger(ExternalTable.class);
 
-    @SerializedName(value = "id")
     protected long id;
-    @SerializedName(value = "name")
     protected String name;
-    @SerializedName(value = "type")
     protected TableType type = null;
-    @SerializedName(value = "timestamp")
     protected long timestamp;
-    @SerializedName(value = "dbName")
     protected String dbName;
     // this field will be refreshed after reloading schema
     protected volatile long schemaUpdateTime;
