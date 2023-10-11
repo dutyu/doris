@@ -39,6 +39,7 @@ import org.apache.doris.statistics.TableStatsMeta;
 import org.apache.doris.thrift.TTableDescriptor;
 
 import com.google.common.collect.Sets;
+import com.google.gson.annotations.SerializedName;
 import lombok.Getter;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.logging.log4j.LogManager;
@@ -64,12 +65,18 @@ import java.util.stream.Collectors;
 public class ExternalTable implements TableIf, Writable, GsonPostProcessable {
     private static final Logger LOG = LogManager.getLogger(ExternalTable.class);
 
+    @SerializedName(value = "id")
     protected long id;
+    @SerializedName(value = "name")
     protected String name;
+    @SerializedName(value = "type")
     protected TableType type = null;
+    @SerializedName(value = "timestamp")
     protected long timestamp;
+    @SerializedName(value = "dbName")
     protected String dbName;
-    protected long lastUpdateTime;
+    // this field will be refreshed after reloading schema
+    protected volatile long schemaUpdateTime;
 
     protected long dbId;
     protected boolean objectCreated;
@@ -289,9 +296,12 @@ public class ExternalTable implements TableIf, Writable, GsonPostProcessable {
         return 0;
     }
 
+    // return schema update time as default
+    // override this method if there is some other kinds of update time
+    // use getSchemaUpdateTime if just need the schema update time
     @Override
     public long getUpdateTime() {
-        return 0;
+        return this.schemaUpdateTime;
     }
 
     @Override
@@ -346,7 +356,7 @@ public class ExternalTable implements TableIf, Writable, GsonPostProcessable {
      * @return
      */
     public List<Column> initSchemaAndUpdateTime() {
-        lastUpdateTime = System.currentTimeMillis();
+        schemaUpdateTime = System.currentTimeMillis();
         return initSchema();
     }
 
