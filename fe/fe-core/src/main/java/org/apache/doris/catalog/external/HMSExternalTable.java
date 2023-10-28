@@ -41,6 +41,7 @@ import org.apache.doris.thrift.TTableType;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
@@ -82,6 +83,9 @@ public class HMSExternalTable extends ExternalTable {
 
     private static final String TBL_PROP_TXN_PROPERTIES = "transactional_properties";
     private static final String TBL_PROP_INSERT_ONLY = "insert_only";
+
+    private static final String TBL_PROP_TRANSIENT_LAST_DDL_TIME = "transient_lastDdlTime";
+
     private static final String NUM_ROWS = "numRows";
 
     static {
@@ -403,6 +407,19 @@ public class HMSExternalTable extends ExternalTable {
         PooledHiveMetaStoreClient client = ((HMSExternalCatalog) catalog).getClient();
         List<String> names = client.listPartitionNames(dbName, name);
         return new HashSet<>(names);
+    }
+
+    @Override
+    public List<Column> initSchemaAndUpdateTime() {
+        org.apache.hadoop.hive.metastore.api.Table table = ((HMSExternalCatalog) catalog).getClient()
+                .getTable(dbName, name);
+        // try to use transient_lastDdlTime from hms client
+        schemaUpdateTime = MapUtils.isNotEmpty(table.getParameters())
+                && table.getParameters().containsKey(TBL_PROP_TRANSIENT_LAST_DDL_TIME)
+                ? Long.parseLong(table.getParameters().get(TBL_PROP_TRANSIENT_LAST_DDL_TIME)) * 1000
+                // use current timestamp if lastDdlTime does not exist (hive views don't have this prop)
+                : System.currentTimeMillis();
+        return initSchema();
     }
 
     @Override
