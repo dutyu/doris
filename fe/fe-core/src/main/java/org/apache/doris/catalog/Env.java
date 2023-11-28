@@ -131,6 +131,7 @@ import org.apache.doris.datasource.CatalogIf;
 import org.apache.doris.datasource.CatalogMgr;
 import org.apache.doris.datasource.EsExternalCatalog;
 import org.apache.doris.datasource.ExternalMetaCacheMgr;
+import org.apache.doris.datasource.ExternalMetaIdMgr;
 import org.apache.doris.datasource.InternalCatalog;
 import org.apache.doris.datasource.hive.HiveTransactionMgr;
 import org.apache.doris.datasource.hive.event.MetastoreEventsProcessor;
@@ -348,6 +349,7 @@ public class Env {
     private DbUsedDataQuotaInfoCollector dbUsedDataQuotaInfoCollector;
     private PartitionInMemoryInfoCollector partitionInMemoryInfoCollector;
     private CooldownConfHandler cooldownConfHandler;
+    private ExternalMetaIdMgr externalMetaIdMgr;
     private MetastoreEventsProcessor metastoreEventsProcessor;
 
     private PersistentJobRegister persistentJobRegister;
@@ -627,6 +629,7 @@ public class Env {
         if (Config.enable_storage_policy) {
             this.cooldownConfHandler = new CooldownConfHandler();
         }
+        this.externalMetaIdMgr = new ExternalMetaIdMgr();
         this.metastoreEventsProcessor = new MetastoreEventsProcessor();
         this.jobTaskManager = new JobTaskManager();
         this.timerJobManager = new TimerJobManager();
@@ -801,6 +804,10 @@ public class Env {
 
     public WorkloadGroupMgr getWorkloadGroupMgr() {
         return workloadGroupMgr;
+    }
+
+    public ExternalMetaIdMgr getExternalMetaIdMgr() {
+        return externalMetaIdMgr;
     }
 
     // use this to get correct ClusterInfoService instance
@@ -1571,9 +1578,6 @@ public class Env {
         singleTabletLoadRecorderMgr.start();
         getInternalCatalog().getIcebergTableCreationRecordMgr().start();
         new InternalSchemaInitializer().start();
-        if (Config.enable_hms_events_incremental_sync) {
-            metastoreEventsProcessor.start();
-        }
         getRefreshManager().start();
 
         // binlog gcer
@@ -1594,6 +1598,9 @@ public class Env {
         domainResolver.start();
         // fe disk updater
         feDiskUpdater.start();
+        if (Config.enable_hms_events_incremental_sync) {
+            metastoreEventsProcessor.start();
+        }
     }
 
     private void transferToNonMaster(FrontendNodeType newType) {

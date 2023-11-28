@@ -51,6 +51,7 @@ import org.apache.doris.datasource.CatalogLog;
 import org.apache.doris.datasource.ExternalObjectLog;
 import org.apache.doris.datasource.InitCatalogLog;
 import org.apache.doris.datasource.InitDatabaseLog;
+import org.apache.doris.datasource.MetaIdMappingsLog;
 import org.apache.doris.ha.MasterInfo;
 import org.apache.doris.journal.Journal;
 import org.apache.doris.journal.JournalCursor;
@@ -998,38 +999,24 @@ public class EditLog {
                     break;
                 }
                 case OperationType.OP_DROP_EXTERNAL_TABLE: {
-                    final ExternalObjectLog log = (ExternalObjectLog) journal.getData();
-                    env.getCatalogMgr().replayDropExternalTable(log);
                     break;
                 }
                 case OperationType.OP_CREATE_EXTERNAL_TABLE: {
-                    final ExternalObjectLog log = (ExternalObjectLog) journal.getData();
-                    env.getCatalogMgr().replayCreateExternalTableFromEvent(log);
                     break;
                 }
                 case OperationType.OP_DROP_EXTERNAL_DB: {
-                    final ExternalObjectLog log = (ExternalObjectLog) journal.getData();
-                    env.getCatalogMgr().replayDropExternalDatabase(log);
                     break;
                 }
                 case OperationType.OP_CREATE_EXTERNAL_DB: {
-                    final ExternalObjectLog log = (ExternalObjectLog) journal.getData();
-                    env.getCatalogMgr().replayCreateExternalDatabase(log);
                     break;
                 }
                 case OperationType.OP_ADD_EXTERNAL_PARTITIONS: {
-                    final ExternalObjectLog log = (ExternalObjectLog) journal.getData();
-                    env.getCatalogMgr().replayAddExternalPartitions(log);
                     break;
                 }
                 case OperationType.OP_DROP_EXTERNAL_PARTITIONS: {
-                    final ExternalObjectLog log = (ExternalObjectLog) journal.getData();
-                    env.getCatalogMgr().replayDropExternalPartitions(log);
                     break;
                 }
                 case OperationType.OP_REFRESH_EXTERNAL_PARTITIONS: {
-                    final ExternalObjectLog log = (ExternalObjectLog) journal.getData();
-                    env.getCatalogMgr().replayRefreshExternalPartitions(log);
                     break;
                 }
                 case OperationType.OP_CREATE_WORKLOAD_GROUP: {
@@ -1111,6 +1098,9 @@ public class EditLog {
                     env.getAnalysisManager().replayTableStatsDeletion((TableStatsDeletionLog) journal.getData());
                     break;
                 }
+                case OperationType.OP_ADD_META_ID_MAPPINGS:
+                    env.getExternalMetaIdMgr().replayMetaIdMappingsLog((MetaIdMappingsLog) journal.getData());
+                    break;
                 default: {
                     IOException e = new IOException();
                     LOG.error("UNKNOWN Operation Type {}", opCode, e);
@@ -1839,26 +1829,32 @@ public class EditLog {
         logEdit(OperationType.OP_REFRESH_EXTERNAL_TABLE, log);
     }
 
+    @Deprecated
     public void logDropExternalTable(ExternalObjectLog log) {
         logEdit(OperationType.OP_DROP_EXTERNAL_TABLE, log);
     }
 
+    @Deprecated
     public void logCreateExternalTable(ExternalObjectLog log) {
         logEdit(OperationType.OP_CREATE_EXTERNAL_TABLE, log);
     }
 
+    @Deprecated
     public void logDropExternalDatabase(ExternalObjectLog log) {
         logEdit(OperationType.OP_DROP_EXTERNAL_DB, log);
     }
 
+    @Deprecated
     public void logCreateExternalDatabase(ExternalObjectLog log) {
         logEdit(OperationType.OP_CREATE_EXTERNAL_DB, log);
     }
 
+    @Deprecated
     public void logAddExternalPartitions(ExternalObjectLog log) {
         logEdit(OperationType.OP_ADD_EXTERNAL_PARTITIONS, log);
     }
 
+    @Deprecated
     public void logDropExternalPartitions(ExternalObjectLog log) {
         logEdit(OperationType.OP_DROP_EXTERNAL_PARTITIONS, log);
     }
@@ -1943,5 +1939,9 @@ public class EditLog {
 
     public void logDeleteTableStats(TableStatsDeletionLog log) {
         logEdit(OperationType.OP_DELETE_TABLE_STATS, log);
+    }
+
+    public void logMetaIdMappingsLog(MetaIdMappingsLog log) {
+        logEdit(OperationType.OP_ADD_META_ID_MAPPINGS, log);
     }
 }
