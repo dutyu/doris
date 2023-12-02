@@ -19,6 +19,7 @@ package org.apache.doris.datasource.deltalake;
 
 import org.apache.doris.catalog.external.HMSExternalDatabase;
 import org.apache.doris.catalog.external.HMSExternalTable;
+import org.apache.doris.cluster.ClusterNamespace;
 import org.apache.doris.datasource.HMSExternalCatalog;
 import org.apache.doris.datasource.InitCatalogLog;
 import org.apache.doris.datasource.SessionContext;
@@ -53,7 +54,7 @@ public class DeltaLakeExternalCatalog extends HMSExternalCatalog {
             }
             return names;
         } else {
-            List<String> allTableNames = client.getAllTables(getRealTableName(dbName));
+            List<String> allTableNames = client.getAllTables(ClusterNamespace.getNameFromFullName(dbName));
             List<String> deltaTableNames = Lists.newArrayList();
             for (String tableName : allTableNames) {
                 Table tableDetails = client.getTable(dbName, tableName);
