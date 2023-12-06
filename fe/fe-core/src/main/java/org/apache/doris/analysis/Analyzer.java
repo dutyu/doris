@@ -39,6 +39,7 @@ import org.apache.doris.common.ErrorCode;
 import org.apache.doris.common.ErrorReport;
 import org.apache.doris.common.IdGenerator;
 import org.apache.doris.common.Pair;
+import org.apache.doris.common.UserException;
 import org.apache.doris.common.util.TimeUtils;
 import org.apache.doris.planner.AggregationNode;
 import org.apache.doris.planner.AnalyticEvalNode;
@@ -845,6 +846,12 @@ public class Analyzer {
                     View hmsView = new View(table.getId(), table.getName(), table.getFullSchema());
                     hmsView.setInlineViewDefWithSqlMode(((HMSExternalTable) table).getViewText(),
                             ConnectContext.get().getSessionVariable().getSqlMode());
+                    // Init view first, otherwise a NPE will be thrown if parser can not parse the view ddl
+                    try {
+                        hmsView.init();
+                    } catch (UserException e) {
+                        throw new AnalysisException("failed to init view stmt, reason=" + e.getMessage());
+                    }
                     InlineViewRef inlineViewRef = new InlineViewRef(hmsView, tableRef);
                     if (StringUtils.isNotEmpty(tableName.getCtl())) {
                         inlineViewRef.setExternalCtl(tableName.getCtl());
