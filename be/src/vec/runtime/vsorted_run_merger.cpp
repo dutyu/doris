@@ -101,10 +101,7 @@ Status VSortedRunMerger::get_next(Block* output_block, bool* eos) {
                 output_block->mutate_columns() : _empty_block.clone_empty_columns();
 
         if (num_columns != merged_columns.size()) {
-            throw Exception(
-                    ErrorCode::INTERNAL_ERROR,
-                    "num_columns!=merged_columns.size(), num_columns={}, merged_columns.size()={}",
-                    num_columns, merged_columns.size());
+            return Status::InternalError("num_columns!=merged_columns.size()");
         }
 
         /// Take rows from queue in right order and push to 'merged'.
