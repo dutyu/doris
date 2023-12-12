@@ -116,8 +116,9 @@ Status VSortedRunMerger::get_next(Block* output_block, bool* eos) {
             if (_offset > 0) {
                 _offset--;
             } else {
-                for (size_t i = 0; i < num_columns; ++i)
+                for (size_t i = 0; i < num_columns; ++i) {
                     merged_columns[i]->insert_from(*current->all_columns[i], current->pos);
+                }
                 ++merged_rows;
             }
             next_heap(current);
