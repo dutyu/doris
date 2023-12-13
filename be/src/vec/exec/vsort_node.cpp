@@ -235,6 +235,10 @@ Status VSortNode::merge_sort_read(doris::RuntimeState *state, doris::vectorized:
     MutableColumns merged_columns =
             mem_reuse ? block->mutate_columns() : _sorted_blocks[0].clone_empty_columns();
 
+    if (num_columns != merged_columns.size()) {
+            return Status::InternalError("num_columns!=merged_columns.size()");
+    }
+
     /// Take rows from queue in right order and push to 'merged'.
     size_t merged_rows = 0;
     while (!_priority_queue.empty()) {
@@ -242,8 +246,9 @@ Status VSortNode::merge_sort_read(doris::RuntimeState *state, doris::vectorized:
         _priority_queue.pop();
 
         if (_offset == 0) {
-            for (size_t i = 0; i < num_columns; ++i)
+            for (size_t i = 0; i < num_columns; ++i) {
                 merged_columns[i]->insert_from(*current->all_columns[i], current->pos);
+            }
             ++merged_rows;
         } else {
             _offset--;
