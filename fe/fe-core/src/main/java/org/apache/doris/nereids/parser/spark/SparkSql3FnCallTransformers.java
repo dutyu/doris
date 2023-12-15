@@ -35,12 +35,12 @@ public class SparkSql3FnCallTransformers extends AbstractFnCallTransformers {
 
     @Override
     protected void registerTransformers() {
-        doRegister("get_json_object", 2, "json_extract",
+        doRegister("get_json_object", 2, "json_extract_string",
                 Lists.newArrayList(
                         PlaceholderExpression.of(Expression.class, 1),
                         PlaceholderExpression.of(Expression.class, 2)), true);
 
-        doRegister("get_json_object", 2, "json_extract",
+        doRegister("get_json_object", 2, "json_extract_string",
                 Lists.newArrayList(
                         PlaceholderExpression.of(Expression.class, 1),
                         PlaceholderExpression.of(Expression.class, 2)), false);
