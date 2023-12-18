@@ -36,8 +36,8 @@ public class PlaceholderExpression extends Expression implements AlwaysNotNullab
 
     private final Class<? extends Expression> delegateClazz;
     /**
-     * start from 1,
-     * a placeholderExpression will be replaced later by the position of sourceFnTransformedArguments
+     * start from 1, set the index of this placeholderExpression in sourceFnTransformedArguments
+     * this placeholderExpression will be replaced later
      */
     private final int position;
 
