@@ -141,8 +141,12 @@ public class HMSExternalTable extends ExternalTable {
     }
 
     public boolean isSupportedHmsTable() {
-        makeSureInitialized();
-        return dlaType != DLAType.UNKNOWN;
+        try {
+            makeSureInitialized();
+            return true;
+        } catch (NotSupportedException e) {
+            return false;
+        }
     }
 
     protected synchronized void makeSureInitialized() {
