@@ -279,7 +279,7 @@ public class HeartbeatMgr extends MasterDaemon {
                                     ? "Unknown error" : result.getStatus().getErrorMsgs().get(0));
                 }
             } catch (Exception e) {
-                LOG.warn("backend heartbeat got exception", e);
+                LOG.debug("backend heartbeat got exception", e);
                 return new BackendHbResponse(backendId, backend.getHost(),
                         Strings.isNullOrEmpty(e.getMessage()) ? "got exception" : e.getMessage());
             } finally {
