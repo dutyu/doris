@@ -28,6 +28,7 @@ import org.apache.doris.common.AnalysisException;
 import org.apache.doris.datasource.HMSExternalCatalog;
 import org.apache.doris.datasource.hive.HiveMetaStoreCache;
 import org.apache.doris.datasource.hive.PooledHiveMetaStoreClient;
+import org.apache.doris.nereids.exceptions.NotSupportedException;
 import org.apache.doris.statistics.AnalysisInfo;
 import org.apache.doris.statistics.BaseAnalysisTask;
 import org.apache.doris.statistics.ColumnStatistic;
@@ -149,7 +150,8 @@ public class HMSExternalTable extends ExternalTable {
         if (!objectCreated) {
             remoteTable = ((HMSExternalCatalog) catalog).getClient().getTable(dbName, name);
             if (remoteTable == null) {
-                dlaType = DLAType.UNKNOWN;
+                throw new IllegalArgumentException("External hive table not exists: " + remoteTable.getDbName()
+                            + "." + remoteTable.getTableName());
             } else {
                 if (supportedIcebergTable()) {
                     dlaType = DLAType.ICEBERG;
@@ -158,7 +160,8 @@ public class HMSExternalTable extends ExternalTable {
                 } else if (supportedHiveTable()) {
                     dlaType = DLAType.HIVE;
                 } else {
-                    dlaType = DLAType.UNKNOWN;
+                    throw new NotSupportedException("Unsupported hive table: " + remoteTable.getDbName()
+                            + "." + remoteTable.getTableName());
                 }
             }
             objectCreated = true;
@@ -205,12 +208,8 @@ public class HMSExternalTable extends ExternalTable {
         if (inputFileFormat == null) {
             return false;
         }
-        boolean supportedFileFormat = SUPPORTED_HIVE_FILE_FORMATS.contains(inputFileFormat);
-        if (!supportedFileFormat) {
-            throw new IllegalArgumentException("Unsupported hive input format: " + inputFileFormat);
-        }
         LOG.debug("hms table {} is {} with file format: {}", name, remoteTable.getTableType(), inputFileFormat);
-        return true;
+        return SUPPORTED_HIVE_FILE_FORMATS.contains(inputFileFormat);
     }
 
     /**

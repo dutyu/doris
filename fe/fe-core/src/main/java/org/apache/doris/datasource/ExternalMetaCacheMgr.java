@@ -17,12 +17,14 @@
 
 package org.apache.doris.datasource;
 
+import org.apache.doris.catalog.Type;
 import org.apache.doris.catalog.external.HMSExternalTable;
 import org.apache.doris.cluster.ClusterNamespace;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.ThreadPoolManager;
 import org.apache.doris.datasource.hive.HiveMetaStoreCache;
 import org.apache.doris.fs.FileSystemCache;
+import org.apache.doris.nereids.exceptions.NotSupportedException;
 import org.apache.doris.planner.external.hudi.HudiPartitionMgr;
 import org.apache.doris.planner.external.hudi.HudiPartitionProcessor;
 import org.apache.doris.planner.external.iceberg.IcebergMetadataCache;
@@ -162,7 +164,14 @@ public class ExternalMetaCacheMgr {
         String dbName = ClusterNamespace.getNameFromFullName(table.getDbName());
         HiveMetaStoreCache metaCache = cacheMap.get(catalogId);
         if (metaCache != null) {
-            metaCache.addPartitionsCache(dbName, table.getName(), partitionNames, table.getPartitionColumnTypes());
+            List<Type> partitionColumnTypes;
+            try {
+                partitionColumnTypes = table.getPartitionColumnTypes();
+            } catch (NotSupportedException e) {
+                LOG.debug("Get partition column types failed and ignore, table: {}", table.getName());
+                return;
+            }
+            metaCache.addPartitionsCache(dbName, table.getName(), partitionNames, partitionColumnTypes);
         }
         LOG.debug("add partition cache for {}.{} in catalog {}", dbName, table.getName(), catalogId);
     }
