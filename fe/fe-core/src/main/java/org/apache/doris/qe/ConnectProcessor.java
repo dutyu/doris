@@ -53,8 +53,11 @@ import org.apache.doris.mysql.MysqlServerStatusFlag;
 import org.apache.doris.nereids.exceptions.NotSupportedException;
 import org.apache.doris.nereids.glue.LogicalPlanAdapter;
 import org.apache.doris.nereids.minidump.MinidumpUtils;
+import org.apache.doris.nereids.parser.Dialect;
 import org.apache.doris.nereids.parser.NereidsParser;
 import org.apache.doris.nereids.stats.StatsErrorEstimator;
+import org.apache.doris.plugin.DialectConverterPlugin;
+import org.apache.doris.plugin.DialectConverterPluginMgr;
 import org.apache.doris.proto.Data;
 import org.apache.doris.qe.QueryState.MysqlStateType;
 import org.apache.doris.thrift.TMasterOpRequest;
@@ -68,6 +71,7 @@ import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
 import io.opentelemetry.context.propagation.TextMapGetter;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -82,6 +86,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import javax.annotation.Nullable;
 
 /**
  * Process one mysql connection, receive one packet, process, send one packet.
@@ -292,7 +297,8 @@ public class ConnectProcessor {
         }
         String originStmt = new String(bytes, 1, ending, StandardCharsets.UTF_8);
 
-        String sqlHash = DigestUtils.md5Hex(originStmt);
+        String convertedStmt = convertOriginStmt(originStmt);
+        String sqlHash = DigestUtils.md5Hex(convertedStmt);
         ctx.setSqlHash(sqlHash);
         ctx.getAuditEventBuilder().reset();
         ctx.getAuditEventBuilder()
@@ -378,6 +384,28 @@ public class ConnectProcessor {
 
         }
 
+    }
+
+    private String convertOriginStmt(String originStmt) {
+        String convertedStmt = originStmt;
+        @Nullable Dialect sqlDialect = Dialect.getByName(ctx.getSessionVariable().getSqlDialect());
+        if (sqlDialect != null) {
+            DialectConverterPluginMgr pluginMgr = Env.getCurrentEnv().getSqlDialectPluginMgr();
+            List<DialectConverterPlugin> plugins = pluginMgr.getDialectConverterPlugins(sqlDialect);
+            for (DialectConverterPlugin plugin : plugins) {
+                try {
+                    String convertedSql = plugin.convertSql(originStmt, ctx.getSessionVariable());
+                    if (StringUtils.isNotEmpty(convertedSql)) {
+                        convertedStmt = convertedSql;
+                        break;
+                    }
+                } catch (Throwable throwable) {
+                    LOG.warn("Convert sql with dialect {} failed, sql: {}, use origin sql.",
+                                sqlDialect, originStmt, throwable);
+                }
+            }
+        }
+        return convertedStmt;
     }
 
     // Use a handler for exception to avoid big try catch block which is a little hard to understand

@@ -18,7 +18,7 @@
 package org.apache.doris.nereids.parser;
 
 /**
- * Trino complex function transformer
+ * Complex function transformer
  */
 public abstract class ComplexFnCallTransformer extends AbstractFnCallTransformer {
 

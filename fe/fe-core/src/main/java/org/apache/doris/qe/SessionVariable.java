@@ -28,8 +28,7 @@ import org.apache.doris.common.io.Writable;
 import org.apache.doris.common.util.TimeUtils;
 import org.apache.doris.nereids.metrics.Event;
 import org.apache.doris.nereids.metrics.EventSwitchParser;
-import org.apache.doris.nereids.parser.ParseDialect;
-import org.apache.doris.nereids.parser.ParseDialect.Dialect;
+import org.apache.doris.nereids.parser.Dialect;
 import org.apache.doris.nereids.rules.RuleType;
 import org.apache.doris.qe.VariableMgr.VarAttr;
 import org.apache.doris.thrift.TQueryOptions;
@@ -2021,8 +2020,12 @@ public class SessionVariable implements Serializable, Writable {
         return sqlDialect;
     }
 
-    public ParseDialect.Dialect getSqlParseDialect() {
-        return ParseDialect.Dialect.getByName(sqlDialect);
+    public int getWaitFullBlockScheduleTimes() {
+        return waitFullBlockScheduleTimes;
+    }
+
+    public Dialect getSqlParseDialect() {
+        return Dialect.getByName(sqlDialect);
     }
 
     public void setSqlDialect(String sqlDialect) {
