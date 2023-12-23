@@ -2020,10 +2020,6 @@ public class SessionVariable implements Serializable, Writable {
         return sqlDialect;
     }
 
-    public int getWaitFullBlockScheduleTimes() {
-        return waitFullBlockScheduleTimes;
-    }
-
     public Dialect getSqlParseDialect() {
         return Dialect.getByName(sqlDialect);
     }

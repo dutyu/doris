@@ -85,4 +85,8 @@ public class VarcharType extends CharacterType {
     public int hashCode() {
         return Objects.hash(super.hashCode(), len);
     }
+
+    public boolean isWildcardVarchar() {
+        return len == -1 || len == MAX_VARCHAR_LENGTH;
+    }
 }

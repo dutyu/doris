@@ -83,13 +83,6 @@ public class NereidsParser {
 
     private List<StatementBase> parseSQLWithDialect(String sql,
                                                     SessionVariable sessionVariable) {
-<<<<<<< HEAD
-        switch (sqlDialect) {
-            case TRINO:
-                final List<StatementBase> logicalPlans = TrinoParser.parse(sql, sessionVariable);
-                if (CollectionUtils.isEmpty(logicalPlans)) {
-                    return parseSQL(sql);
-=======
         @Nullable Dialect sqlDialect = Dialect.getByName(sessionVariable.getSqlDialect());
         if (sqlDialect == null) {
             return parseSQL(sql);
@@ -102,7 +95,6 @@ public class NereidsParser {
                 List<StatementBase> statementBases = plugin.parseSqlWithDialect(sql, sessionVariable);
                 if (CollectionUtils.isNotEmpty(statementBases)) {
                     return statementBases;
->>>>>>> 72f272e785 ([Refactor](dialect) Add sql dialect converter plugins.)
                 }
             } catch (Throwable throwable) {
                 LOG.warn("Parse sql with dialect {} failed, sql: {}.", sqlDialect, sql, throwable);
