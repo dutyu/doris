@@ -91,7 +91,7 @@ public class NereidsParser {
         DialectConverterPluginMgr pluginMgr = Env.getCurrentEnv().getSqlDialectPluginMgr();
         List<DialectConverterPlugin> plugins = pluginMgr.getDialectConverterPlugins(sqlDialect);
         for (DialectConverterPlugin plugin : plugins) {
-            LOG.debug("Use plugin {} for dialect {}", plugin.getClass().getSimpleName(), sqlDialect);
+            LOG.debug("Use plugin {} for dialect {} with sql: {}", plugin.getClass().getSimpleName(), sqlDialect, sql);
             try {
                 List<StatementBase> statementBases = plugin.parseSqlWithDialect(sql, sessionVariable);
                 if (CollectionUtils.isNotEmpty(statementBases)) {

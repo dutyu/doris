@@ -19,7 +19,6 @@ package org.apache.doris.plugin.dialect.trino;
 
 import org.apache.doris.analysis.StatementBase;
 import org.apache.doris.nereids.StatementContext;
-import org.apache.doris.nereids.exceptions.UnsupportedDialectException;
 import org.apache.doris.nereids.glue.LogicalPlanAdapter;
 import org.apache.doris.nereids.parser.Dialect;
 import org.apache.doris.nereids.parser.ParserContext;
@@ -50,6 +49,7 @@ public class TrinoParser {
      * Parse with trino syntax, return null if parse failed
      */
     public static @Nullable List<StatementBase> parse(String sql, SessionVariable sessionVariable) {
+        LOG.debug("Start parse sql : {}", sql);
         final List<StatementBase> logicalPlans = new ArrayList<>();
         try {
             io.trino.sql.parser.StatementSplitter splitter = new io.trino.sql.parser.StatementSplitter(sql);
@@ -61,10 +61,11 @@ public class TrinoParser {
                         ? null : new LogicalPlanAdapter((LogicalPlan) parsedPlan, statementContext));
             }
             if (logicalPlans.isEmpty() || logicalPlans.stream().anyMatch(Objects::isNull)) {
+                LOG.debug("LogicalPlans is empty or any plan is null");
                 return null;
             }
             return logicalPlans;
-        } catch (io.trino.sql.parser.ParsingException | UnsupportedDialectException e) {
+        } catch (Throwable e) {
             LOG.debug("Failed to parse logical plan from trino, sql is :{}", sql, e);
             return null;
         }
