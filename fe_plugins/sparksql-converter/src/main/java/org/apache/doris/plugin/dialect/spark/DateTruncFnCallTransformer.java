@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.doris.nereids.parser.spark;
+package org.apache.doris.plugin.dialect.spark;
 
 import org.apache.doris.nereids.analyzer.UnboundFunction;
 import org.apache.doris.nereids.parser.ComplexFnCallTransformer;
@@ -55,13 +55,13 @@ public class DateTruncFnCallTransformer extends ComplexFnCallTransformer {
 
     @Override
     protected boolean check(String sourceFnName, List<Expression> sourceFnTransformedArguments,
-            ParserContext context) {
+                            ParserContext context) {
         return getSourceFnName().equalsIgnoreCase(sourceFnName) && (sourceFnTransformedArguments.size() == 2);
     }
 
     @Override
     protected Function transform(String sourceFnName, List<Expression> sourceFnTransformedArguments,
-            ParserContext context) {
+                                 ParserContext context) {
         VarcharLiteral fmtLiteral = (VarcharLiteral) sourceFnTransformedArguments.get(1);
         if (YEAR.contains(fmtLiteral.getValue().toUpperCase())) {
             return new UnboundFunction(

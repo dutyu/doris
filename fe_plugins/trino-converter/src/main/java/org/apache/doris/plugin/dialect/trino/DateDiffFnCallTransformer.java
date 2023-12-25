@@ -17,19 +17,21 @@
 
 package org.apache.doris.plugin.dialect.trino;
 
-import com.google.common.collect.ImmutableList;
 import org.apache.doris.nereids.analyzer.UnboundFunction;
+import org.apache.doris.nereids.parser.ComplexFnCallTransformer;
 import org.apache.doris.nereids.parser.ParserContext;
 import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.functions.Function;
 import org.apache.doris.nereids.trees.expressions.literal.VarcharLiteral;
+
+import com.google.common.collect.ImmutableList;
 
 import java.util.List;
 
 /**
  * DateDiff complex function transformer
  */
-public class DateDiffFnCallTransformer extends ComplexTrinoFnCallTransformer {
+public class DateDiffFnCallTransformer extends ComplexFnCallTransformer {
 
     private static final String SECOND = "second";
     private static final String HOUR = "hour";
