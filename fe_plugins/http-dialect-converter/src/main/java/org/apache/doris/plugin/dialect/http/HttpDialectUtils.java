@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.doris.plugin.dialect.presto;
+package org.apache.doris.plugin.dialect.http;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -52,8 +52,8 @@ import java.nio.charset.StandardCharsets;
  * "code": 0,
  * "message": ""
  */
-public class SQLDialectUtils {
-    private static final Logger LOG = LogManager.getLogger(SQLDialectUtils.class);
+public class HttpDialectUtils {
+    private static final Logger LOG = LogManager.getLogger(HttpDialectUtils.class);
 
     public static String convertSql(String targetURL, String originStmt) {
         ConvertRequest convertRequest = new ConvertRequest(originStmt, "presto");

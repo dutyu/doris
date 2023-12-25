@@ -15,9 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.doris.plugin.dialect.presto;
+package org.apache.doris.plugin.dialect.http;
 
-import com.google.common.base.Preconditions;
 import org.apache.doris.nereids.parser.Dialect;
 import org.apache.doris.plugin.DialectConverterPlugin;
 import org.apache.doris.plugin.Plugin;
@@ -26,6 +25,7 @@ import org.apache.doris.plugin.PluginException;
 import org.apache.doris.plugin.PluginInfo;
 import org.apache.doris.qe.SessionVariable;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 
 import java.io.IOException;
@@ -33,17 +33,19 @@ import java.io.InputStream;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Properties;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
-public class PrestoDialectConverterPlugin extends Plugin implements DialectConverterPlugin {
+public class HttpDialectConverterPlugin extends Plugin implements DialectConverterPlugin {
 
     private volatile boolean isInit = false;
     private volatile boolean isClosed = false;
     private volatile String targetURL = null;
+    private volatile ImmutableSet<Dialect> acceptDialects = null;
 
     @Override
     public void init(PluginInfo info, PluginContext ctx) throws PluginException {
@@ -83,6 +85,10 @@ public class PrestoDialectConverterPlugin extends Plugin implements DialectConve
         final Map<String, String> properties = props.stringPropertyNames().stream()
                 .collect(Collectors.toMap(Function.identity(), props::getProperty));
         targetURL = properties.get("target_url");
+        acceptDialects = ImmutableSet.copyOf(Arrays.stream(properties.get("accept_dialects").split(","))
+               .map(Dialect::getByName)
+               .filter(dialect -> dialect!= null)
+               .collect(ImmutableSet.toImmutableSet()));
     }
 
     @Override
@@ -93,12 +99,12 @@ public class PrestoDialectConverterPlugin extends Plugin implements DialectConve
 
     @Override
     public ImmutableSet<Dialect> acceptDialects() {
-        return ImmutableSet.of(Dialect.PRESTO);
+        return acceptDialects;
     }
 
     @Override
     public @Nullable String convertSql(String originSql, SessionVariable sessionVariable) {
         Preconditions.checkNotNull(targetURL);
-        return SQLDialectUtils.convertSql(targetURL, originSql);
+        return HttpDialectUtils.convertSql(targetURL, originSql);
     }
 }

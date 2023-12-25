@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.doris.plugin.dialect.presto;
+package org.apache.doris.plugin.dialect.http;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -27,7 +27,7 @@ import java.net.DatagramSocket;
 import java.net.ServerSocket;
 import java.net.SocketException;
 
-public class SQLDialectUtilsTest {
+public class HttpDialectUtilsTest {
 
     private int port;
     private SimpleHttpServer server;
