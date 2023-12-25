@@ -78,6 +78,9 @@ under the License.
         <lombok.version>1.18.24</lombok.version>
         <junit.version>5.8.2</junit.version>
         <jmockit.version>1.49</jmockit.version>
+        <!-- antlr4 The version of antlr-runtime in trino parser is need to be consistent with doris,
+    when upgrade doris antlr-runtime version, should take care of trino-parser.-->
+        <antlr4.version>4.9.3</antlr4.version>
     </properties>
     <profiles>
         <!-- for custom internal repository -->
