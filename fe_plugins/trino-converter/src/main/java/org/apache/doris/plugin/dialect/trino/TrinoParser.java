@@ -52,7 +52,8 @@ public class TrinoParser {
         LOG.debug("Start parse sql : {}", sql);
         final List<StatementBase> logicalPlans = new ArrayList<>();
         try {
-            io.trino.sql.parser.StatementSplitter splitter = new io.trino.sql.parser.StatementSplitter(sql);
+            io.trino.sql.parser.StatementSplitter splitter = new io.trino.sql.parser.StatementSplitter(
+                        addDelimiterIfNeeded(sql));
             ParserContext parserContext = new ParserContext(Dialect.TRINO);
             StatementContext statementContext = new StatementContext();
             for (io.trino.sql.parser.StatementSplitter.Statement statement : splitter.getCompleteStatements()) {
@@ -87,5 +88,17 @@ public class TrinoParser {
         Preconditions.checkArgument(parserContext.getParserDialect() == Dialect.TRINO);
         io.trino.sql.tree.Statement statement = TrinoParser.parse(sql);
         return (T) new TrinoLogicalPlanBuilder().visit(statement, parserContext);
+    }
+
+    /**
+     * {@link io.trino.sql.parser.StatementSplitter} use ";" as the delimiter if not set
+     * So add ";" if sql does not end with ";",
+     * otherwise {@link io.trino.sql.parser.StatementSplitter#getCompleteStatements()} will return empty list
+     */
+    private static String addDelimiterIfNeeded(String sql) {
+        if (!sql.trim().endsWith(";")) {
+            return sql + ";";
+        }
+        return sql;
     }
 }

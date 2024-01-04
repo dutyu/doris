@@ -57,7 +57,7 @@ import org.apache.doris.nereids.parser.Dialect;
 import org.apache.doris.nereids.parser.NereidsParser;
 import org.apache.doris.nereids.stats.StatsErrorEstimator;
 import org.apache.doris.plugin.DialectConverterPlugin;
-import org.apache.doris.plugin.DialectConverterPluginMgr;
+import org.apache.doris.plugin.PluginMgr;
 import org.apache.doris.proto.Data;
 import org.apache.doris.qe.QueryState.MysqlStateType;
 import org.apache.doris.thrift.TMasterOpRequest;
@@ -390,8 +390,8 @@ public class ConnectProcessor {
         String convertedStmt = originStmt;
         @Nullable Dialect sqlDialect = Dialect.getByName(ctx.getSessionVariable().getSqlDialect());
         if (sqlDialect != null) {
-            DialectConverterPluginMgr pluginMgr = Env.getCurrentEnv().getSqlDialectPluginMgr();
-            List<DialectConverterPlugin> plugins = pluginMgr.getDialectConverterPlugins(sqlDialect);
+            PluginMgr pluginMgr = Env.getCurrentEnv().getPluginMgr();
+            List<DialectConverterPlugin> plugins = pluginMgr.getActiveDialectPluginList(sqlDialect);
             for (DialectConverterPlugin plugin : plugins) {
                 try {
                     String convertedSql = plugin.convertSql(originStmt, ctx.getSessionVariable());
