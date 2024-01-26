@@ -453,9 +453,11 @@ public abstract class ExternalCatalog
         Map<Long,  ExternalDatabase<? extends ExternalTable>> tmpIdToDb = Maps.newConcurrentMap();
         for (int i = 0; i < log.getRefreshCount(); i++) {
             ExternalDatabase<? extends ExternalTable> db = getDbForReplay(log.getRefreshDbIds().get(i));
-            db.setUnInitialized(invalidCacheInInit);
-            tmpDbNameToId.put(db.getFullName(), db.getId());
-            tmpIdToDb.put(db.getId(), db);
+            if (db != null) {
+                db.setUnInitialized(invalidCacheInInit);
+                tmpDbNameToId.put(db.getFullName(), db.getId());
+                tmpIdToDb.put(db.getId(), db);
+            }
         }
         for (int i = 0; i < log.getCreateCount(); i++) {
             ExternalDatabase<? extends ExternalTable> db =
