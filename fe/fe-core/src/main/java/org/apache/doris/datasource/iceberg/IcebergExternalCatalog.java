@@ -18,11 +18,10 @@
 package org.apache.doris.datasource.iceberg;
 
 import org.apache.doris.catalog.Env;
+import org.apache.doris.catalog.external.ExternalCatalog;
 import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.FeNameFormat;
 import org.apache.doris.common.util.Util;
-import org.apache.doris.datasource.ExternalCatalog;
-import org.apache.doris.datasource.InitCatalogLog;
 import org.apache.doris.datasource.SessionContext;
 
 import org.apache.iceberg.catalog.Catalog;
@@ -49,13 +48,13 @@ public abstract class IcebergExternalCatalog extends ExternalCatalog {
     protected SupportsNamespaces nsCatalog;
 
     public IcebergExternalCatalog(long catalogId, String name, String comment) {
-        super(catalogId, name, InitCatalogLog.Type.ICEBERG, comment);
+        super(catalogId, name, ExternalCatalog.Type.ICEBERG, comment);
     }
 
     @Override
-    protected void init() {
+    protected void initForMaster() {
         nsCatalog = (SupportsNamespaces) catalog;
-        super.init();
+        super.initForMaster();
     }
 
     public Catalog getCatalog() {

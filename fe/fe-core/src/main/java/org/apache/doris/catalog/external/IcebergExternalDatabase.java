@@ -18,8 +18,6 @@
 package org.apache.doris.catalog.external;
 
 import org.apache.doris.catalog.TableIf;
-import org.apache.doris.datasource.ExternalCatalog;
-import org.apache.doris.datasource.InitDatabaseLog;
 import org.apache.doris.datasource.iceberg.IcebergExternalCatalog;
 
 import org.apache.logging.log4j.LogManager;
@@ -34,7 +32,7 @@ public class IcebergExternalDatabase extends ExternalDatabase<IcebergExternalTab
     private static final Logger LOG = LogManager.getLogger(IcebergExternalDatabase.class);
 
     public IcebergExternalDatabase(ExternalCatalog extCatalog, Long id, String name) {
-        super(extCatalog, id, name, InitDatabaseLog.Type.ICEBERG);
+        super(extCatalog, id, name, ExternalCatalog.Type.ICEBERG);
     }
 
     @Override

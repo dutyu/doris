@@ -19,6 +19,7 @@ package org.apache.doris.datasource;
 
 import org.apache.doris.catalog.EsResource;
 import org.apache.doris.catalog.external.EsExternalDatabase;
+import org.apache.doris.catalog.external.ExternalCatalog;
 import org.apache.doris.common.DdlException;
 import org.apache.doris.external.elasticsearch.DorisEsException;
 import org.apache.doris.external.elasticsearch.EsRestClient;
@@ -51,7 +52,7 @@ public class EsExternalCatalog extends ExternalCatalog {
      * Default constructor for EsExternalCatalog.
      */
     public EsExternalCatalog(long catalogId, String name, String resource, Map<String, String> props, String comment) {
-        super(catalogId, name, InitCatalogLog.Type.ES, comment);
+        super(catalogId, name, ExternalCatalog.Type.ES, comment);
         this.catalogProperty = new CatalogProperty(resource, processCompatibleProperties(props));
     }
 

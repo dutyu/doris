@@ -17,11 +17,11 @@
 
 package org.apache.doris.datasource.deltalake;
 
+import org.apache.doris.catalog.external.ExternalCatalog;
 import org.apache.doris.catalog.external.HMSExternalDatabase;
 import org.apache.doris.catalog.external.HMSExternalTable;
 import org.apache.doris.cluster.ClusterNamespace;
 import org.apache.doris.datasource.HMSExternalCatalog;
-import org.apache.doris.datasource.InitCatalogLog;
 import org.apache.doris.datasource.SessionContext;
 
 import com.google.common.collect.Lists;
@@ -34,7 +34,7 @@ public class DeltaLakeExternalCatalog extends HMSExternalCatalog {
 
     public DeltaLakeExternalCatalog(long catalogId, String name, String resource, Map<String, String> props,
                 String comment) {
-        super(catalogId, name, resource, props, comment, InitCatalogLog.Type.DELTALAKE);
+        super(catalogId, name, resource, props, comment, ExternalCatalog.Type.DELTALAKE);
     }
 
     @Override

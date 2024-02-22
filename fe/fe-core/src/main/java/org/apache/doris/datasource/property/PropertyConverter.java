@@ -17,10 +17,10 @@
 
 package org.apache.doris.datasource.property;
 
+import org.apache.doris.catalog.external.ExternalCatalog.Type;
 import org.apache.doris.common.util.S3Util;
 import org.apache.doris.common.util.Util;
 import org.apache.doris.datasource.CatalogMgr;
-import org.apache.doris.datasource.InitCatalogLog.Type;
 import org.apache.doris.datasource.credentials.CloudCredential;
 import org.apache.doris.datasource.credentials.CloudCredentialWithEndpoint;
 import org.apache.doris.datasource.iceberg.IcebergExternalCatalog;

@@ -26,6 +26,7 @@ import org.apache.doris.analysis.RefreshCatalogStmt;
 import org.apache.doris.analysis.StatementBase;
 import org.apache.doris.catalog.Env;
 import org.apache.doris.catalog.Resource;
+import org.apache.doris.catalog.external.ExternalCatalog;
 import org.apache.doris.common.DdlException;
 import org.apache.doris.common.FeConstants;
 import org.apache.doris.datasource.deltalake.DeltaLakeExternalCatalog;

@@ -17,7 +17,7 @@
 
 package org.apache.doris.planner.external.hudi;
 
-import org.apache.doris.datasource.ExternalCatalog;
+import org.apache.doris.catalog.external.ExternalCatalog;
 import org.apache.doris.datasource.HMSExternalCatalog;
 
 import com.google.common.collect.Maps;

@@ -20,6 +20,7 @@ package org.apache.doris.datasource;
 import org.apache.doris.catalog.AuthType;
 import org.apache.doris.catalog.Env;
 import org.apache.doris.catalog.HdfsResource;
+import org.apache.doris.catalog.external.ExternalCatalog;
 import org.apache.doris.catalog.external.ExternalDatabase;
 import org.apache.doris.catalog.external.ExternalTable;
 import org.apache.doris.catalog.external.HMSExternalDatabase;
@@ -68,13 +69,13 @@ public class HMSExternalCatalog extends ExternalCatalog {
      */
     public HMSExternalCatalog(long catalogId, String name, String resource, Map<String, String> props,
             String comment) {
-        super(catalogId, name, InitCatalogLog.Type.HMS, comment);
+        super(catalogId, name, ExternalCatalog.Type.HMS, comment);
         props = PropertyConverter.convertToMetaProperties(props);
         catalogProperty = new CatalogProperty(resource, props);
     }
 
     public HMSExternalCatalog(long catalogId, String name, String resource, Map<String, String> props,
-            String comment, InitCatalogLog.Type type) {
+            String comment, ExternalCatalog.Type type) {
         super(catalogId, name, type, comment);
         props = PropertyConverter.convertToMetaProperties(props);
         catalogProperty = new CatalogProperty(resource, props);
@@ -199,7 +200,7 @@ public class HMSExternalCatalog extends ExternalCatalog {
     public void createDatabase(long dbId, String dbName) {
         LOG.debug("create database [{}]", dbName);
         dbNameToId.put(dbName, dbId);
-        ExternalDatabase<? extends ExternalTable> db = getDbForInit(dbName, dbId, logType);
+        ExternalDatabase<? extends ExternalTable> db = getDbForInit(dbName, dbId, type);
         idToDb.put(dbId, db);
     }
 

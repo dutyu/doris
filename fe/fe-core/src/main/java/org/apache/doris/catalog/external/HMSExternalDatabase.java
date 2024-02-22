@@ -18,9 +18,7 @@
 package org.apache.doris.catalog.external;
 
 import org.apache.doris.catalog.TableIf;
-import org.apache.doris.datasource.ExternalCatalog;
 import org.apache.doris.datasource.HMSExternalCatalog;
-import org.apache.doris.datasource.InitDatabaseLog;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -43,10 +41,10 @@ public class HMSExternalDatabase extends ExternalDatabase<HMSExternalTable> {
      * @param name database name.
      */
     public HMSExternalDatabase(ExternalCatalog extCatalog, long id, String name) {
-        super(extCatalog, id, name, InitDatabaseLog.Type.HMS);
+        super(extCatalog, id, name, ExternalCatalog.Type.HMS);
     }
 
-    public HMSExternalDatabase(ExternalCatalog extCatalog, long id, String name, InitDatabaseLog.Type type) {
+    public HMSExternalDatabase(ExternalCatalog extCatalog, long id, String name, ExternalCatalog.Type type) {
         super(extCatalog, id, name, type);
     }
 
@@ -67,7 +65,7 @@ public class HMSExternalDatabase extends ExternalDatabase<HMSExternalTable> {
     }
 
     @Override
-    public void dropTable(String tableName) {
+    public synchronized void dropTable(String tableName) {
         LOG.debug("replayDropTableFromEvent [{}]", tableName);
         Long tableId = tableNameToId.remove(tableName);
         if (tableId == null) {
@@ -78,7 +76,7 @@ public class HMSExternalDatabase extends ExternalDatabase<HMSExternalTable> {
     }
 
     @Override
-    public void createTable(String tableName, long tableId) {
+    public synchronized void createTable(String tableName, long tableId) {
         LOG.debug("create table [{}]", tableName);
         tableNameToId.put(tableName, tableId);
         HMSExternalTable table = getExternalTable(tableName, tableId, extCatalog);

@@ -18,10 +18,9 @@
 package org.apache.doris.datasource.test;
 
 import org.apache.doris.catalog.Column;
+import org.apache.doris.catalog.external.ExternalCatalog;
 import org.apache.doris.catalog.external.TestExternalDatabase;
 import org.apache.doris.datasource.CatalogProperty;
-import org.apache.doris.datasource.ExternalCatalog;
-import org.apache.doris.datasource.InitCatalogLog;
 import org.apache.doris.datasource.SessionContext;
 
 import com.google.common.collect.Lists;
@@ -43,7 +42,7 @@ public class TestExternalCatalog extends ExternalCatalog {
 
     public TestExternalCatalog(long catalogId, String name, String resource, Map<String, String> props,
             String comment) {
-        super(catalogId, name, InitCatalogLog.Type.TEST, comment);
+        super(catalogId, name, ExternalCatalog.Type.TEST, comment);
         this.catalogProperty = new CatalogProperty(resource, props);
         Class<?> providerClazz = null;
         try {

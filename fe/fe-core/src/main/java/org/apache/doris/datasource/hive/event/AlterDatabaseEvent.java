@@ -19,9 +19,9 @@
 package org.apache.doris.datasource.hive.event;
 
 import org.apache.doris.catalog.Env;
+import org.apache.doris.catalog.external.ExternalCatalog;
 import org.apache.doris.common.DdlException;
 import org.apache.doris.datasource.CatalogIf;
-import org.apache.doris.datasource.ExternalCatalog;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

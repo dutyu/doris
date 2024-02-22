@@ -15,47 +15,45 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.doris.datasource;
+package org.apache.doris.catalog.external;
 
 import org.apache.doris.catalog.Env;
+import org.apache.doris.datasource.CatalogIf;
+import org.apache.doris.datasource.MetaIdMappingsLog;
 import org.apache.doris.datasource.hive.event.MetastoreEventsProcessor;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import lombok.Data;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
 
 /**
  * <pre>
  * ExternalMetaIdMgr is responsible for managing external meta ids.
- * Now it just manages the external meta ids of hms events,
- * but it will be extended to manage other external meta ids in the future.
  * </pre>
- * TODO: remove InitCatalogLog and InitDatabaseLog, manage external meta ids at ExternalMetaIdMgr
  */
 public class ExternalMetaIdMgr {
 
     private static final Logger LOG = LogManager.getLogger(ExternalMetaIdMgr.class);
+
+    public static final long META_ID_FOR_NOT_EXISTS = -1L;
 
     private final Map<Long, CtlMetaIdMgr> idToCtlMgr = Maps.newConcurrentMap();
 
     public ExternalMetaIdMgr() {
     }
 
-    // invoke this method only on master
-    public static long nextMetaId() {
-        return Env.getCurrentEnv().getNextId();
-    }
-
     // return the db id of the specified db, -1 means not exists
     public long getDbId(long catalogId, String dbName) {
         DbMetaIdMgr dbMetaIdMgr = getDbMetaIdMgr(catalogId, dbName);
         if (dbMetaIdMgr == null) {
-            return -1L;
+            return META_ID_FOR_NOT_EXISTS;
         }
         return dbMetaIdMgr.dbId;
     }
@@ -64,7 +62,7 @@ public class ExternalMetaIdMgr {
     public long getTblId(long catalogId, String dbName, String tblName) {
         TblMetaIdMgr tblMetaIdMgr = getTblMetaIdMgr(catalogId, dbName, tblName);
         if (tblMetaIdMgr == null) {
-            return -1L;
+            return META_ID_FOR_NOT_EXISTS;
         }
         return tblMetaIdMgr.tblId;
     }
@@ -74,9 +72,13 @@ public class ExternalMetaIdMgr {
                                String tblName, String partitionName) {
         PartitionMetaIdMgr partitionMetaIdMgr = getPartitionMetaIdMgr(catalogId, dbName, tblName, partitionName);
         if (partitionMetaIdMgr == null) {
-            return -1L;
+            return META_ID_FOR_NOT_EXISTS;
         }
         return partitionMetaIdMgr.partitionId;
+    }
+
+    public @Nullable CtlMetaIdMgr getCtlMetaIdMgr(long catalogId) {
+        return idToCtlMgr.get(catalogId);
     }
 
     public @Nullable DbMetaIdMgr getDbMetaIdMgr(long catalogId, String dbName) {
@@ -87,7 +89,7 @@ public class ExternalMetaIdMgr {
         return ctlMetaIdMgr.dbNameToMgr.get(dbName);
     }
 
-    public @Nullable TblMetaIdMgr getTblMetaIdMgr(long catalogId, String dbName, String tblName) {
+    private @Nullable TblMetaIdMgr getTblMetaIdMgr(long catalogId, String dbName, String tblName) {
         DbMetaIdMgr dbMetaIdMgr = getDbMetaIdMgr(catalogId, dbName);
         if (dbMetaIdMgr == null) {
             return null;
@@ -95,7 +97,7 @@ public class ExternalMetaIdMgr {
         return dbMetaIdMgr.tblNameToMgr.get(tblName);
     }
 
-    public PartitionMetaIdMgr getPartitionMetaIdMgr(long catalogId, String dbName,
+    private PartitionMetaIdMgr getPartitionMetaIdMgr(long catalogId, String dbName,
                                                     String tblName, String partitionName) {
         TblMetaIdMgr tblMetaIdMgr = getTblMetaIdMgr(catalogId, dbName, tblName);
         if (tblMetaIdMgr == null) {
@@ -107,22 +109,63 @@ public class ExternalMetaIdMgr {
     public void replayMetaIdMappingsLog(@NotNull MetaIdMappingsLog log) {
         Preconditions.checkNotNull(log);
         long catalogId = log.getCatalogId();
-        CtlMetaIdMgr ctlMetaIdMgr = idToCtlMgr.computeIfAbsent(catalogId, CtlMetaIdMgr::new);
-        for (MetaIdMappingsLog.MetaIdMapping mapping : log.getMetaIdMappings()) {
-            handleMetaIdMapping(mapping, ctlMetaIdMgr);
+        CatalogIf<?> catalogIf = Env.getCurrentEnv().getCatalogMgr().getCatalog(catalogId);
+        if (catalogIf == null) {
+            return;
         }
-        if (log.isFromHmsEvent()) {
-            CatalogIf<?> catalogIf = Env.getCurrentEnv().getCatalogMgr().getCatalog(log.getCatalogId());
-            if (catalogIf != null) {
+
+        CtlMetaIdMgr ctlMetaIdMgr = idToCtlMgr.computeIfAbsent(catalogId, CtlMetaIdMgr::new);
+        CtlMetaIdMgr tmpCtlMetaIdMgr;
+        switch (log.getType()) {
+            case MetaIdMappingsLog.TYPE_FROM_INIT_CATALOG:
+                // use a new CtlMetaIdMgr to handle these logs, and replace the old one
+                tmpCtlMetaIdMgr = new CtlMetaIdMgr(catalogId);
+                for (MetaIdMappingsLog.MetaIdMapping mapping : log.getMetaIdMappings()) {
+                    handleMetaIdMapping(mapping, tmpCtlMetaIdMgr);
+                }
+                idToCtlMgr.put(catalogId, tmpCtlMetaIdMgr);
+                // do the extra init operations
+                ((ExternalCatalog) catalogIf).initForAllNodes(tmpCtlMetaIdMgr, log.getLastUpdateTime());
+                break;
+
+            case MetaIdMappingsLog.TYPE_FROM_INIT_DATABASE:
+                // use a new CtlMetaIdMgr to handle these logs, and replace the old one
+                tmpCtlMetaIdMgr = new CtlMetaIdMgr(catalogId);
+                for (MetaIdMappingsLog.MetaIdMapping mapping : log.getMetaIdMappings()) {
+                    handleMetaIdMapping(mapping, tmpCtlMetaIdMgr);
+                }
+                for (String dbName : ctlMetaIdMgr.dbNameToMgr.keySet()) {
+                    // put the dbMetaIdMgr of ctlMetaIdMgr to tmpCtlMetaIdMgr which not contains
+                    if (!tmpCtlMetaIdMgr.dbNameToMgr.containsKey(dbName)) {
+                        tmpCtlMetaIdMgr.dbNameToMgr.put(dbName, ctlMetaIdMgr.dbNameToMgr.get(dbName));
+                    }
+                }
+                idToCtlMgr.put(catalogId, tmpCtlMetaIdMgr);
+                // do the extra init operations
+                @SuppressWarnings("rawtypes")
+                ExternalDatabase db = (ExternalDatabase) catalogIf.getDbNullable(log.getDbName());
+                if (db != null) {
+                    db.initForAllNodes(tmpCtlMetaIdMgr.dbNameToMgr.get(db.name), log.getLastUpdateTime());
+                }
+                break;
+
+            case MetaIdMappingsLog.TYPE_FROM_HMS_EVENT:
+                for (MetaIdMappingsLog.MetaIdMapping mapping : log.getMetaIdMappings()) {
+                    handleMetaIdMapping(mapping, ctlMetaIdMgr);
+                }
+
                 MetastoreEventsProcessor metastoreEventsProcessor = Env.getCurrentEnv().getMetastoreEventsProcessor();
-                metastoreEventsProcessor.updateMasterLastSyncedEventId(
-                            (HMSExternalCatalog) catalogIf, log.getLastSyncedEventId());
-            }
+                metastoreEventsProcessor.updateMasterLastSyncedEventId(catalogIf.getId(), log.getLastSyncedEventId());
+                break;
+
+            default:
+                // do nothing
         }
     }
 
     // no lock because the operations is serialized currently
-    private void handleMetaIdMapping(MetaIdMappingsLog.MetaIdMapping mapping, CtlMetaIdMgr ctlMetaIdMgr) {
+    private void handleMetaIdMapping(MetaIdMappingsLog.MetaIdMapping mapping,
+                                     CtlMetaIdMgr ctlMetaIdMgr) {
         MetaIdMappingsLog.OperationType opType = MetaIdMappingsLog.getOperationType(mapping.getOpType());
         MetaIdMappingsLog.MetaObjectType objType = MetaIdMappingsLog.getMetaObjectType(mapping.getMetaObjType());
         switch (opType) {
@@ -174,6 +217,7 @@ public class ExternalMetaIdMgr {
     private static void handleAddMetaIdMapping(MetaIdMappingsLog.MetaIdMapping mapping,
                                                CtlMetaIdMgr ctlMetaIdMgr,
                                                MetaIdMappingsLog.MetaObjectType objType) {
+        Preconditions.checkArgument(mapping.getId() > 0);
         DbMetaIdMgr dbMetaIdMgr;
         TblMetaIdMgr tblMetaIdMgr;
         switch (objType) {
@@ -203,6 +247,67 @@ public class ExternalMetaIdMgr {
         }
     }
 
+    // invoke this method only on master
+    public static long nextMetaId() {
+        return Env.getCurrentEnv().getNextId();
+    }
+
+    // invoke this method only on master
+    // try to reuse the exists ids
+    public static long generateDbId(@Nullable CtlMetaIdMgr oldCtlMetaIdMgr,
+                                    String dbName) {
+        if (oldCtlMetaIdMgr == null) {
+            return nextMetaId();
+        }
+        DbMetaIdMgr dbMetaIdMgr = oldCtlMetaIdMgr.dbNameToMgr.get(dbName);
+        if (dbMetaIdMgr == null) {
+            return nextMetaId();
+        }
+        return dbMetaIdMgr.dbId == META_ID_FOR_NOT_EXISTS ? nextMetaId() : dbMetaIdMgr.dbId;
+    }
+
+    // invoke this method only on master
+    // try to reuse the exists ids
+    public static long generateTblId(@Nullable CtlMetaIdMgr oldCtlMetaIdMgr,
+                                     String dbName, String tblName) {
+        if (oldCtlMetaIdMgr == null) {
+            return nextMetaId();
+        }
+        DbMetaIdMgr dbMetaIdMgr = oldCtlMetaIdMgr.dbNameToMgr.get(dbName);
+        if (dbMetaIdMgr == null) {
+            return nextMetaId();
+        }
+        TblMetaIdMgr tblMetaIdMgr = dbMetaIdMgr.tblNameToMgr.get(tblName);
+        if (tblMetaIdMgr == null) {
+            return nextMetaId();
+        }
+        return tblMetaIdMgr.tblId == META_ID_FOR_NOT_EXISTS ? nextMetaId() : tblMetaIdMgr.tblId;
+    }
+
+    // invoke this method only on master
+    // try to reuse the exists ids
+    public static long generatePartitionId(@Nullable CtlMetaIdMgr oldCtlMetaIdMgr,
+                                           String dbName, String tblName, String pName) {
+        if (oldCtlMetaIdMgr == null) {
+            return nextMetaId();
+        }
+        DbMetaIdMgr dbMetaIdMgr = oldCtlMetaIdMgr.dbNameToMgr.get(dbName);
+        if (dbMetaIdMgr == null) {
+            return nextMetaId();
+        }
+        TblMetaIdMgr tblMetaIdMgr = dbMetaIdMgr.tblNameToMgr.get(tblName);
+        if (tblMetaIdMgr == null) {
+            return nextMetaId();
+        }
+        PartitionMetaIdMgr partitionMetaIdMgr = tblMetaIdMgr.partitionNameToMgr.get(pName);
+        if (partitionMetaIdMgr == null) {
+            return nextMetaId();
+        }
+        return partitionMetaIdMgr.partitionId == META_ID_FOR_NOT_EXISTS
+                    ? nextMetaId() : partitionMetaIdMgr.partitionId;
+    }
+
+    @Data
     public static class CtlMetaIdMgr {
         protected final long catalogId;
 
@@ -211,10 +316,17 @@ public class ExternalMetaIdMgr {
         }
 
         protected Map<String, DbMetaIdMgr> dbNameToMgr = Maps.newConcurrentMap();
+
+        public CtlMetaIdMgr copy() {
+            CtlMetaIdMgr copy = new CtlMetaIdMgr(this.catalogId);
+            copy.dbNameToMgr = new ConcurrentHashMap<>(this.dbNameToMgr);
+            return copy;
+        }
     }
 
+    @Data
     public static class DbMetaIdMgr {
-        protected volatile long dbId = -1L;
+        protected volatile long dbId = META_ID_FOR_NOT_EXISTS;
         protected final String dbName;
 
         protected DbMetaIdMgr(long dbId, String dbName) {
@@ -229,8 +341,9 @@ public class ExternalMetaIdMgr {
         protected Map<String, TblMetaIdMgr> tblNameToMgr = Maps.newConcurrentMap();
     }
 
+    @Data
     public static class TblMetaIdMgr {
-        protected volatile long tblId = -1L;
+        protected volatile long tblId = META_ID_FOR_NOT_EXISTS;
         protected final String tblName;
 
         protected TblMetaIdMgr(long tblId, String tblName) {
@@ -246,7 +359,7 @@ public class ExternalMetaIdMgr {
     }
 
     public static class PartitionMetaIdMgr {
-        protected volatile long partitionId = -1L;
+        protected volatile long partitionId = META_ID_FOR_NOT_EXISTS;
         protected final String partitionName;
 
         protected PartitionMetaIdMgr(long partitionId, String partitionName) {

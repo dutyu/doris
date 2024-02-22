@@ -88,6 +88,7 @@ import org.apache.doris.catalog.MetaIdGenerator.IdGeneratorBuffer;
 import org.apache.doris.catalog.OlapTable.OlapTableState;
 import org.apache.doris.catalog.Replica.ReplicaStatus;
 import org.apache.doris.catalog.TableIf.TableType;
+import org.apache.doris.catalog.external.ExternalMetaIdMgr;
 import org.apache.doris.clone.ColocateTableCheckerAndBalancer;
 import org.apache.doris.clone.DynamicPartitionScheduler;
 import org.apache.doris.clone.TabletChecker;
@@ -131,7 +132,6 @@ import org.apache.doris.datasource.CatalogIf;
 import org.apache.doris.datasource.CatalogMgr;
 import org.apache.doris.datasource.EsExternalCatalog;
 import org.apache.doris.datasource.ExternalMetaCacheMgr;
-import org.apache.doris.datasource.ExternalMetaIdMgr;
 import org.apache.doris.datasource.InternalCatalog;
 import org.apache.doris.datasource.hive.HiveTransactionMgr;
 import org.apache.doris.datasource.hive.event.MetastoreEventsProcessor;
@@ -754,6 +754,10 @@ public class Env {
         } else {
             return SingletonHolder.INSTANCE;
         }
+    }
+
+    public void setCatalogMgr(CatalogMgr catalogMgr) {
+        this.catalogMgr = catalogMgr;
     }
 
     // NOTICE: in most case, we should use getCurrentEnv() to get the right catalog.

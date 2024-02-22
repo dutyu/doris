@@ -60,7 +60,6 @@ import org.apache.iceberg.Table;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.LocalDate;
@@ -665,12 +664,6 @@ public class HMSExternalTable extends ExternalTable {
     // eventUpdateTime will be refreshed after processing events with hms event listener enabled
     public long getUpdateTime() {
         return Math.max(this.schemaUpdateTime, this.eventUpdateTime);
-    }
-
-    @Override
-    public void gsonPostProcess() throws IOException {
-        super.gsonPostProcess();
-        estimatedRowCount = -1;
     }
 
     @Override

@@ -17,6 +17,8 @@
 
 package org.apache.doris.datasource;
 
+import org.apache.doris.catalog.external.ExternalMetaIdMgr;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -34,18 +36,48 @@ public class MetaIdMappingsLogTest {
         MetaIdMappingsLog log1 = new MetaIdMappingsLog();
         Path path = Files.createFile(Paths.get("./metaIdMappingsLogTest.txt"));
         try (DataOutputStream dos = new DataOutputStream(Files.newOutputStream(path))) {
-            log1.setFromHmsEvent(true);
+            log1.setType(MetaIdMappingsLog.TYPE_FROM_HMS_EVENT);
             log1.setLastSyncedEventId(-1L);
             log1.setCatalogId(1L);
-            log1.addFromCreateDatabaseEvent("db1");
-            log1.addFromDropTableEvent("db1", "tbl1");
-            log1.addFromDropTableEvent("db1", "tbl2");
-            log1.addFromDropDatabaseEvent("db2");
-            log1.addFromAddPartitionEvent("db1", "tbl1", "p1");
-            log1.addFromAddPartitionEvent("db1", "tbl1", "p2");
-            log1.addFromDropDatabaseEvent("db2");
-            log1.addFromDropTableEvent("db1", "tbl1");
-            log1.addFromDropPartitionEvent("db1", "tbl1", "p2");
+            log1.addMetaIdMapping(new MetaIdMappingsLog.MetaIdMapping(
+                        MetaIdMappingsLog.OPERATION_TYPE_ADD,
+                        MetaIdMappingsLog.META_OBJECT_TYPE_DATABASE,
+                        "db1",
+                        ExternalMetaIdMgr.nextMetaId()));
+            log1.addMetaIdMapping(new MetaIdMappingsLog.MetaIdMapping(
+                        MetaIdMappingsLog.OPERATION_TYPE_DELETE,
+                        MetaIdMappingsLog.META_OBJECT_TYPE_TABLE,
+                        "db1", "tbl1"));
+            log1.addMetaIdMapping(new MetaIdMappingsLog.MetaIdMapping(
+                        MetaIdMappingsLog.OPERATION_TYPE_DELETE,
+                        MetaIdMappingsLog.META_OBJECT_TYPE_TABLE,
+                        "db1", "tbl2"));
+            log1.addMetaIdMapping(new MetaIdMappingsLog.MetaIdMapping(
+                        MetaIdMappingsLog.OPERATION_TYPE_DELETE,
+                        MetaIdMappingsLog.META_OBJECT_TYPE_DATABASE,
+                        "db2"));
+            log1.addMetaIdMapping(new MetaIdMappingsLog.MetaIdMapping(
+                        MetaIdMappingsLog.OPERATION_TYPE_ADD,
+                        MetaIdMappingsLog.META_OBJECT_TYPE_PARTITION,
+                        "db1", "tbl1", "p1",
+                        ExternalMetaIdMgr.nextMetaId()));
+            log1.addMetaIdMapping(new MetaIdMappingsLog.MetaIdMapping(
+                        MetaIdMappingsLog.OPERATION_TYPE_ADD,
+                        MetaIdMappingsLog.META_OBJECT_TYPE_PARTITION,
+                        "db1", "tbl1", "p2",
+                        ExternalMetaIdMgr.nextMetaId()));
+            log1.addMetaIdMapping(new MetaIdMappingsLog.MetaIdMapping(
+                        MetaIdMappingsLog.OPERATION_TYPE_DELETE,
+                        MetaIdMappingsLog.META_OBJECT_TYPE_DATABASE,
+                        "db2"));
+            log1.addMetaIdMapping(new MetaIdMappingsLog.MetaIdMapping(
+                        MetaIdMappingsLog.OPERATION_TYPE_DELETE,
+                        MetaIdMappingsLog.META_OBJECT_TYPE_TABLE,
+                        "db1", "tbl1"));
+            log1.addMetaIdMapping(new MetaIdMappingsLog.MetaIdMapping(
+                        MetaIdMappingsLog.OPERATION_TYPE_DELETE,
+                        MetaIdMappingsLog.META_OBJECT_TYPE_PARTITION,
+                        "db1", "tbl1", "p2"));
             log1.write(dos);
             dos.flush();
         } catch (Throwable throwable) {

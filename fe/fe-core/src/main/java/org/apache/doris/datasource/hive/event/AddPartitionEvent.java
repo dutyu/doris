@@ -19,9 +19,12 @@
 package org.apache.doris.datasource.hive.event;
 
 import org.apache.doris.catalog.Env;
+import org.apache.doris.catalog.external.ExternalMetaIdMgr;
 import org.apache.doris.common.DdlException;
+import org.apache.doris.datasource.MetaIdMappingsLog;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.hive.common.FileUtils;
@@ -97,7 +100,7 @@ public class AddPartitionEvent extends MetastorePartitionEvent {
         try {
             infoLog("catalogName:[{}],dbName:[{}],tableName:[{}],partitionNames:[{}]", catalogName, dbName, tblName,
                     partitionNames.toString());
-            // bail out early if there are not any partitions to process
+            // bail out early if there are not partitions to process
             if (partitionNames.isEmpty()) {
                 infoLog("Partition list is empty. Ignoring this event.");
                 return;
@@ -108,5 +111,19 @@ public class AddPartitionEvent extends MetastorePartitionEvent {
             throw new MetastoreNotificationException(
                     debugString("Failed to process event"), e);
         }
+    }
+
+    @Override
+    protected List<MetaIdMappingsLog.MetaIdMapping> transferToMetaIdMappings() {
+        List<MetaIdMappingsLog.MetaIdMapping> metaIdMappings = Lists.newArrayList();
+        for (String partitionName : this.getAllPartitionNames()) {
+            MetaIdMappingsLog.MetaIdMapping metaIdMapping = new MetaIdMappingsLog.MetaIdMapping(
+                        MetaIdMappingsLog.OPERATION_TYPE_ADD,
+                        MetaIdMappingsLog.META_OBJECT_TYPE_PARTITION,
+                        dbName, tblName, partitionName,
+                        ExternalMetaIdMgr.nextMetaId());
+            metaIdMappings.add(metaIdMapping);
+        }
+        return ImmutableList.copyOf(metaIdMappings);
     }
 }

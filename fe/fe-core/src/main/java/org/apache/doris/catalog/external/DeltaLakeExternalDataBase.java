@@ -17,14 +17,12 @@
 
 package org.apache.doris.catalog.external;
 
-import org.apache.doris.datasource.ExternalCatalog;
-import org.apache.doris.datasource.InitDatabaseLog;
 import org.apache.doris.datasource.deltalake.DeltaLakeExternalCatalog;
 
 public class DeltaLakeExternalDataBase extends HMSExternalDatabase {
 
     public DeltaLakeExternalDataBase(ExternalCatalog extCatalog, long id, String name) {
-        super(extCatalog, id, name, InitDatabaseLog.Type.DELTALAKE);
+        super(extCatalog, id, name, ExternalCatalog.Type.DELTALAKE);
     }
 
     @Override

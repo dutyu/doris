@@ -18,6 +18,7 @@
 package org.apache.doris.datasource;
 
 
+import org.apache.doris.catalog.external.ExternalCatalog;
 import org.apache.doris.common.DdlException;
 import org.apache.doris.datasource.credentials.CloudCredential;
 import org.apache.doris.datasource.property.constants.MCProperties;
@@ -57,7 +58,7 @@ public class MaxComputeExternalCatalog extends ExternalCatalog {
 
     public MaxComputeExternalCatalog(long catalogId, String name, String resource, Map<String, String> props,
                                      String comment) {
-        super(catalogId, name, InitCatalogLog.Type.MAX_COMPUTE, comment);
+        super(catalogId, name, ExternalCatalog.Type.MAX_COMPUTE, comment);
         catalogProperty = new CatalogProperty(resource, props);
     }
 

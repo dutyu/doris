@@ -979,8 +979,7 @@ public class EditLog {
                     break;
                 }
                 case OperationType.OP_INIT_CATALOG: {
-                    final InitCatalogLog log = (InitCatalogLog) journal.getData();
-                    env.getCatalogMgr().replayInitCatalog(log);
+                    // Do nothing.
                     break;
                 }
                 case OperationType.OP_REFRESH_EXTERNAL_DB: {
@@ -989,8 +988,7 @@ public class EditLog {
                     break;
                 }
                 case OperationType.OP_INIT_EXTERNAL_DB: {
-                    final InitDatabaseLog log = (InitDatabaseLog) journal.getData();
-                    env.getCatalogMgr().replayInitExternalDb(log);
+                    // Do nothing.
                     break;
                 }
                 case OperationType.OP_REFRESH_EXTERNAL_TABLE: {

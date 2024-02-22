@@ -17,8 +17,8 @@
 
 package org.apache.doris.datasource.iceberg;
 
+import org.apache.doris.catalog.external.ExternalCatalog;
 import org.apache.doris.common.DdlException;
-import org.apache.doris.datasource.ExternalCatalog;
 
 import java.util.Map;
 

@@ -17,9 +17,8 @@
 
 package org.apache.doris.datasource.paimon;
 
+import org.apache.doris.catalog.external.ExternalCatalog;
 import org.apache.doris.common.DdlException;
-import org.apache.doris.datasource.ExternalCatalog;
-import org.apache.doris.datasource.InitCatalogLog;
 import org.apache.doris.datasource.SessionContext;
 import org.apache.doris.datasource.property.constants.PaimonProperties;
 
@@ -50,12 +49,12 @@ public abstract class PaimonExternalCatalog extends ExternalCatalog {
     );
 
     public PaimonExternalCatalog(long catalogId, String name, String comment) {
-        super(catalogId, name, InitCatalogLog.Type.PAIMON, comment);
+        super(catalogId, name, ExternalCatalog.Type.PAIMON, comment);
     }
 
     @Override
-    protected void init() {
-        super.init();
+    protected void initForMaster() {
+        super.initForMaster();
     }
 
     public Catalog getCatalog() {

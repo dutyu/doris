@@ -17,8 +17,6 @@
 
 package org.apache.doris.catalog.external;
 
-import org.apache.doris.datasource.ExternalCatalog;
-import org.apache.doris.datasource.InitDatabaseLog;
 import org.apache.doris.datasource.MaxComputeExternalCatalog;
 
 /**
@@ -33,7 +31,7 @@ public class MaxComputeExternalDatabase extends ExternalDatabase<MaxComputeExter
      * @param name database name.
      */
     public MaxComputeExternalDatabase(ExternalCatalog extCatalog, long id, String name) {
-        super(extCatalog, id, name, InitDatabaseLog.Type.MAX_COMPUTE);
+        super(extCatalog, id, name, ExternalCatalog.Type.MAX_COMPUTE);
     }
 
     @Override

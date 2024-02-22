@@ -40,8 +40,6 @@ import org.apache.doris.cooldown.CooldownConfList;
 import org.apache.doris.cooldown.CooldownDelete;
 import org.apache.doris.datasource.CatalogLog;
 import org.apache.doris.datasource.ExternalObjectLog;
-import org.apache.doris.datasource.InitCatalogLog;
-import org.apache.doris.datasource.InitDatabaseLog;
 import org.apache.doris.datasource.MetaIdMappingsLog;
 import org.apache.doris.ha.MasterInfo;
 import org.apache.doris.journal.bdbje.Timestamp;
@@ -735,16 +733,8 @@ public class JournalEntity implements Writable {
                 isRead = true;
                 break;
             }
-            case OperationType.OP_INIT_CATALOG: {
-                data = InitCatalogLog.read(in);
-                isRead = true;
-                break;
-            }
-            case OperationType.OP_INIT_EXTERNAL_DB: {
-                data = InitDatabaseLog.read(in);
-                isRead = true;
-                break;
-            }
+            case OperationType.OP_INIT_CATALOG:
+            case OperationType.OP_INIT_EXTERNAL_DB:
             case OperationType.OP_INIT_EXTERNAL_TABLE:
             case OperationType.OP_DROP_EXTERNAL_TABLE:
             case OperationType.OP_CREATE_EXTERNAL_TABLE:

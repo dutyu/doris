@@ -30,6 +30,7 @@ import org.apache.doris.catalog.Env;
 import org.apache.doris.catalog.Resource;
 import org.apache.doris.catalog.Resource.ReferenceType;
 import org.apache.doris.catalog.TableIf;
+import org.apache.doris.catalog.external.ExternalCatalog;
 import org.apache.doris.catalog.external.ExternalDatabase;
 import org.apache.doris.catalog.external.ExternalTable;
 import org.apache.doris.catalog.external.HMSExternalDatabase;
@@ -614,30 +615,6 @@ public class CatalogMgr implements Writable, GsonPostProcessable {
         } finally {
             writeUnlock();
         }
-    }
-
-    // init catalog and init db can happen at any time,
-    // even after catalog or db is dropped.
-    // Because it may already hold the catalog or db object before they are being dropped.
-    // So just skip the edit log if object does not exist.
-    public void replayInitCatalog(InitCatalogLog log) {
-        ExternalCatalog catalog = (ExternalCatalog) idToCatalog.get(log.getCatalogId());
-        if (catalog == null) {
-            return;
-        }
-        catalog.replayInitCatalog(log);
-    }
-
-    public void replayInitExternalDb(InitDatabaseLog log) {
-        ExternalCatalog catalog = (ExternalCatalog) idToCatalog.get(log.getCatalogId());
-        if (catalog == null) {
-            return;
-        }
-        ExternalDatabase db = catalog.getDbForReplay(log.getDbId());
-        if (db == null) {
-            return;
-        }
-        db.replayInitDb(log, catalog);
     }
 
     public void replayRefreshExternalDb(ExternalObjectLog log) {

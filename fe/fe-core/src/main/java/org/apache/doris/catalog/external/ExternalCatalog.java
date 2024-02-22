@@ -15,34 +15,33 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.doris.datasource;
+package org.apache.doris.catalog.external;
 
 import org.apache.doris.catalog.Column;
 import org.apache.doris.catalog.DatabaseIf;
 import org.apache.doris.catalog.Env;
 import org.apache.doris.catalog.Resource;
 import org.apache.doris.catalog.TableIf;
-import org.apache.doris.catalog.external.DeltaLakeExternalDataBase;
-import org.apache.doris.catalog.external.EsExternalDatabase;
-import org.apache.doris.catalog.external.ExternalDatabase;
-import org.apache.doris.catalog.external.ExternalTable;
-import org.apache.doris.catalog.external.HMSExternalDatabase;
-import org.apache.doris.catalog.external.IcebergExternalDatabase;
-import org.apache.doris.catalog.external.JdbcExternalDatabase;
-import org.apache.doris.catalog.external.MaxComputeExternalDatabase;
-import org.apache.doris.catalog.external.PaimonExternalDatabase;
-import org.apache.doris.catalog.external.TestExternalDatabase;
 import org.apache.doris.cluster.ClusterNamespace;
 import org.apache.doris.common.DdlException;
 import org.apache.doris.common.io.Text;
 import org.apache.doris.common.io.Writable;
 import org.apache.doris.common.util.Util;
+import org.apache.doris.datasource.CatalogIf;
+import org.apache.doris.datasource.CatalogMgr;
+import org.apache.doris.datasource.CatalogProperty;
+import org.apache.doris.datasource.ExternalSchemaCache;
+import org.apache.doris.datasource.HMSExternalCatalog;
+import org.apache.doris.datasource.InitCatalogLog;
+import org.apache.doris.datasource.MetaIdMappingsLog;
+import org.apache.doris.datasource.SessionContext;
 import org.apache.doris.datasource.property.PropertyConverter;
 import org.apache.doris.persist.gson.GsonPostProcessable;
 import org.apache.doris.persist.gson.GsonUtils;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.MasterCatalogExecutor;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -83,31 +82,28 @@ public abstract class ExternalCatalog
     protected long id;
     @SerializedName(value = "name")
     protected String name;
-    // TODO: Keep this to compatible with older version meta data. Need to remove after several DORIS versions.
-    protected String type;
     @SerializedName(value = "logType")
     protected InitCatalogLog.Type logType;
     // save properties of this catalog, such as hive meta store url.
     @SerializedName(value = "catalogProperty")
     protected CatalogProperty catalogProperty;
-    @SerializedName(value = "initialized")
     private boolean initialized = false;
-    @SerializedName(value = "idToDb")
     protected Map<Long, ExternalDatabase<? extends ExternalTable>> idToDb = Maps.newConcurrentMap();
     @SerializedName(value = "lastUpdateTime")
     protected long lastUpdateTime;
+    @SerializedName(value = "type")
+    protected Type type;
     // db name does not contains "default_cluster"
     protected Map<String, Long> dbNameToId = Maps.newConcurrentMap();
     private boolean objectCreated = false;
-    protected boolean invalidCacheInInit = true;
 
     private ExternalSchemaCache schemaCache;
     private String comment;
 
-    public ExternalCatalog(long catalogId, String name, InitCatalogLog.Type logType, String comment) {
+    public ExternalCatalog(long catalogId, String name, Type type, String comment) {
         this.id = catalogId;
         this.name = name;
-        this.logType = logType;
+        this.type = type;
         this.comment = com.google.common.base.Strings.nullToEmpty(comment);
     }
 
@@ -174,8 +170,7 @@ public abstract class ExternalCatalog
                 }
                 return;
             }
-            init();
-            initialized = true;
+            initForMaster();
         }
     }
 
@@ -245,15 +240,17 @@ public abstract class ExternalCatalog
     }
 
     // init schema related objects
-    protected void init() {
-        Map<String, Long> tmpDbNameToId = Maps.newConcurrentMap();
-        Map<Long, ExternalDatabase<? extends ExternalTable>> tmpIdToDb = Maps.newConcurrentMap();
-        InitCatalogLog initCatalogLog = new InitCatalogLog();
-        initCatalogLog.setCatalogId(id);
-        initCatalogLog.setType(logType);
+    protected void initForMaster() {
+        ExternalMetaIdMgr.CtlMetaIdMgr ctlMetaIdMgr = Env.getCurrentEnv().getExternalMetaIdMgr()
+                    .getCtlMetaIdMgr(id);
         List<String> allDatabases = listDatabaseNames();
         Map<String, Boolean> includeDatabaseMap = getIncludeDatabaseMap();
         Map<String, Boolean> excludeDatabaseMap = getExcludeDatabaseMap();
+
+        MetaIdMappingsLog log = new MetaIdMappingsLog();
+        log.setCatalogId(id);
+        log.setType(MetaIdMappingsLog.TYPE_FROM_INIT_CATALOG);
+        log.setLastUpdateTime(System.currentTimeMillis());
         for (String dbName : allDatabases) {
             // Exclude database map take effect with higher priority over include database map
             if (!excludeDatabaseMap.isEmpty() && excludeDatabaseMap.containsKey(dbName)) {
@@ -262,33 +259,42 @@ public abstract class ExternalCatalog
             if (!includeDatabaseMap.isEmpty() && !includeDatabaseMap.containsKey(dbName)) {
                 continue;
             }
-            long dbId;
-            if (dbNameToId != null && dbNameToId.containsKey(dbName)) {
-                dbId = dbNameToId.get(dbName);
-                tmpDbNameToId.put(dbName, dbId);
-                ExternalDatabase<? extends ExternalTable> db = idToDb.get(dbId);
-                db.setUnInitialized(invalidCacheInInit);
-                tmpIdToDb.put(dbId, db);
-                initCatalogLog.addRefreshDb(dbId);
-            } else {
-                dbId = Env.getCurrentEnv().getNextId();
-                tmpDbNameToId.put(dbName, dbId);
-                ExternalDatabase<? extends ExternalTable> db = getDbForInit(dbName, dbId, logType);
-                tmpIdToDb.put(dbId, db);
-                initCatalogLog.addCreateDb(dbId, dbName);
-            }
+            MetaIdMappingsLog.MetaIdMapping metaIdMapping = new MetaIdMappingsLog.MetaIdMapping(
+                    MetaIdMappingsLog.OPERATION_TYPE_ADD,
+                    MetaIdMappingsLog.META_OBJECT_TYPE_DATABASE,
+                    dbName,
+                    ExternalMetaIdMgr.generateDbId(ctlMetaIdMgr != null ? ctlMetaIdMgr.copy() : null, dbName));
+            log.addMetaIdMapping(metaIdMapping);
+
         }
-        dbNameToId = tmpDbNameToId;
-        idToDb = tmpIdToDb;
-        lastUpdateTime = System.currentTimeMillis();
-        initCatalogLog.setLastUpdateTime(lastUpdateTime);
-        Env.getCurrentEnv().getEditLog().logInitCatalog(initCatalogLog);
+        Env.getCurrentEnv().getExternalMetaIdMgr().replayMetaIdMappingsLog(log);
+        Env.getCurrentEnv().getEditLog().logMetaIdMappingsLog(log);
+    }
+
+    protected synchronized void initForAllNodes(ExternalMetaIdMgr.CtlMetaIdMgr ctlMetaIdMgr, long lastUpdateTime) {
+        // use a temp map and replace the old one later
+        Map<Long, ExternalDatabase<? extends ExternalTable>> tmpIdToDb = Maps.newConcurrentMap();
+        Map<String, Long> tmpDbNameToId = Maps.newConcurrentMap();
+        Map<String, ExternalMetaIdMgr.DbMetaIdMgr> dbNameToMgr = ctlMetaIdMgr.getDbNameToMgr();
+        // refresh all dbs, reuse the exists dbs if possible
+        for (String dbName : dbNameToMgr.keySet()) {
+            ExternalDatabase<? extends ExternalTable> db = dbNameToId.containsKey(dbName)
+                    ? idToDb.get(dbNameToId.get(dbName))
+                    : getDbForInit(dbName, dbNameToMgr.get(dbName).dbId, type);
+            Preconditions.checkNotNull(db);
+            db.setUnInitialized(true);
+            tmpIdToDb.put(db.getId(), db);
+            tmpDbNameToId.put(ClusterNamespace.getNameFromFullName(db.getFullName()), db.getId());
+        }
+        this.idToDb = tmpIdToDb;
+        this.dbNameToId = tmpDbNameToId;
+        this.lastUpdateTime = lastUpdateTime;
+        this.initialized = true;
     }
 
     public void setUninitialized(boolean invalidCache) {
         this.objectCreated = false;
         this.initialized = false;
-        this.invalidCacheInInit = invalidCache;
         if (invalidCache) {
             Env.getCurrentEnv().getExtMetaCacheMgr().invalidateCatalogCache(id);
         }
@@ -324,7 +330,7 @@ public abstract class ExternalCatalog
 
     @Override
     public String getType() {
-        return logType.name().toLowerCase(Locale.ROOT);
+        return type.name().toLowerCase(Locale.ROOT);
     }
 
     @Override
@@ -448,38 +454,13 @@ public abstract class ExternalCatalog
         Env.getCurrentEnv().getAccessManager().removeAccessController(name);
     }
 
-    public void replayInitCatalog(InitCatalogLog log) {
-        Map<String, Long> tmpDbNameToId = Maps.newConcurrentMap();
-        Map<Long,  ExternalDatabase<? extends ExternalTable>> tmpIdToDb = Maps.newConcurrentMap();
-        for (int i = 0; i < log.getRefreshCount(); i++) {
-            ExternalDatabase<? extends ExternalTable> db = getDbForReplay(log.getRefreshDbIds().get(i));
-            if (db != null) {
-                db.setUnInitialized(invalidCacheInInit);
-                tmpDbNameToId.put(db.getFullName(), db.getId());
-                tmpIdToDb.put(db.getId(), db);
-            }
-        }
-        for (int i = 0; i < log.getCreateCount(); i++) {
-            ExternalDatabase<? extends ExternalTable> db =
-                    getDbForInit(log.getCreateDbNames().get(i), log.getCreateDbIds().get(i), log.getType());
-            if (db != null) {
-                tmpDbNameToId.put(db.getFullName(), db.getId());
-                tmpIdToDb.put(db.getId(), db);
-            }
-        }
-        dbNameToId = tmpDbNameToId;
-        idToDb = tmpIdToDb;
-        lastUpdateTime = log.getLastUpdateTime();
-        initialized = true;
-    }
-
     public  ExternalDatabase<? extends ExternalTable> getDbForReplay(long dbId) {
         return idToDb.get(dbId);
     }
 
     protected ExternalDatabase<? extends ExternalTable> getDbForInit(String dbName, long dbId,
-                                                                     InitCatalogLog.Type logType) {
-        switch (logType) {
+                                                                     Type type) {
+        switch (type) {
             case HMS:
                 return new HMSExternalDatabase(this, dbId, dbName);
             case ES:
@@ -511,30 +492,21 @@ public abstract class ExternalCatalog
 
     @Override
     public void gsonPostProcess() throws IOException {
-        if (idToDb == null) {
-            // ExternalCatalog is loaded from meta with older version
-            idToDb = Maps.newConcurrentMap();
-        }
-        dbNameToId = Maps.newConcurrentMap();
-        for (ExternalDatabase<? extends ExternalTable> db : idToDb.values()) {
-            dbNameToId.put(ClusterNamespace.getNameFromFullName(db.getFullName()), db.getId());
-            db.setExtCatalog(this);
-            db.setTableExtCatalog(this);
-        }
-        objectCreated = false;
         // TODO: This code is to compatible with older version of metadata.
-        //  Could only remove after all users upgrate to the new version.
-        if (logType == null) {
-            if (type == null) {
-                logType = InitCatalogLog.Type.UNKNOWN;
+        //  Could only remove after all users upgrade to the new version.
+        if (type == null) {
+            if (logType == null) {
+                type = Type.UNKNOWN;
             } else {
                 try {
-                    logType = InitCatalogLog.Type.valueOf(type.toUpperCase(Locale.ROOT));
+                    type = Type.valueOf(logType.name());
                 } catch (Exception e) {
-                    logType = InitCatalogLog.Type.UNKNOWN;
+                    type = Type.UNKNOWN;
                 }
             }
         }
+        dbNameToId = Maps.newConcurrentMap();
+        idToDb = Maps.newConcurrentMap();
     }
 
     public void addDatabaseForTest(ExternalDatabase<? extends ExternalTable> db) {
@@ -615,5 +587,19 @@ public abstract class ExternalCatalog
     @Override
     public ConcurrentHashMap<Long, DatabaseIf> getIdToDb() {
         return new ConcurrentHashMap<>(idToDb);
+    }
+
+    public enum Type {
+        HMS,
+        ES,
+        JDBC,
+        ICEBERG,
+        PAIMON,
+        MAX_COMPUTE,
+        HUDI,
+        DELTALAKE,
+        TEST,
+        INFO_SCHEMA_DB,
+        UNKNOWN;
     }
 }

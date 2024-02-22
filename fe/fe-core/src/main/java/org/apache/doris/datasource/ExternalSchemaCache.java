@@ -18,6 +18,7 @@
 package org.apache.doris.datasource;
 
 import org.apache.doris.catalog.Column;
+import org.apache.doris.catalog.external.ExternalCatalog;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.util.Util;
 import org.apache.doris.metric.GaugeMetric;

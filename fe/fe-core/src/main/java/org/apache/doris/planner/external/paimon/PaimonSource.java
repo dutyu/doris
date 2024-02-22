@@ -19,9 +19,9 @@ package org.apache.doris.planner.external.paimon;
 
 import org.apache.doris.analysis.TupleDescriptor;
 import org.apache.doris.catalog.TableIf;
+import org.apache.doris.catalog.external.ExternalCatalog;
 import org.apache.doris.catalog.external.PaimonExternalTable;
 import org.apache.doris.common.UserException;
-import org.apache.doris.datasource.ExternalCatalog;
 import org.apache.doris.planner.ColumnRange;
 import org.apache.doris.thrift.TFileAttributes;
 

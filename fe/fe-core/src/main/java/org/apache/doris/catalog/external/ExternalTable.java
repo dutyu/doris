@@ -26,11 +26,8 @@ import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.DdlException;
 import org.apache.doris.common.MetaNotFoundException;
 import org.apache.doris.common.io.Text;
-import org.apache.doris.common.io.Writable;
 import org.apache.doris.common.util.Util;
-import org.apache.doris.datasource.ExternalCatalog;
 import org.apache.doris.datasource.ExternalSchemaCache;
-import org.apache.doris.persist.gson.GsonPostProcessable;
 import org.apache.doris.persist.gson.GsonUtils;
 import org.apache.doris.statistics.AnalysisInfo;
 import org.apache.doris.statistics.BaseAnalysisTask;
@@ -39,7 +36,6 @@ import org.apache.doris.statistics.TableStatsMeta;
 import org.apache.doris.thrift.TTableDescriptor;
 
 import com.google.common.collect.Sets;
-import com.google.gson.annotations.SerializedName;
 import lombok.Getter;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.logging.log4j.LogManager;
@@ -62,24 +58,19 @@ import java.util.stream.Collectors;
  * Such as tables from hive, iceberg, es, etc.
  */
 @Getter
-public class ExternalTable implements TableIf, Writable, GsonPostProcessable {
+public class ExternalTable implements TableIf {
     private static final Logger LOG = LogManager.getLogger(ExternalTable.class);
 
-    @SerializedName(value = "id")
     protected long id;
-    @SerializedName(value = "name")
     protected String name;
-    @SerializedName(value = "type")
     protected TableType type = null;
-    @SerializedName(value = "timestamp")
     protected long timestamp;
-    @SerializedName(value = "dbName")
     protected String dbName;
     // this field will be refreshed after reloading schema
     protected volatile long schemaUpdateTime;
 
     protected long dbId;
-    protected boolean objectCreated;
+    protected volatile boolean objectCreated = false;
     protected ExternalCatalog catalog;
     protected ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock(true);
 
@@ -377,12 +368,6 @@ public class ExternalTable implements TableIf, Writable, GsonPostProcessable {
     public static ExternalTable read(DataInput in) throws IOException {
         String json = Text.readString(in);
         return GsonUtils.GSON.fromJson(json, ExternalTable.class);
-    }
-
-    @Override
-    public void gsonPostProcess() throws IOException {
-        rwLock = new ReentrantReadWriteLock(true);
-        objectCreated = false;
     }
 
     @Override

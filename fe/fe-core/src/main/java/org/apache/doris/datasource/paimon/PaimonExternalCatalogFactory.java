@@ -17,8 +17,8 @@
 
 package org.apache.doris.datasource.paimon;
 
+import org.apache.doris.catalog.external.ExternalCatalog;
 import org.apache.doris.common.DdlException;
-import org.apache.doris.datasource.ExternalCatalog;
 
 import org.apache.commons.lang3.StringUtils;
 
