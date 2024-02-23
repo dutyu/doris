@@ -19,6 +19,7 @@
 package org.apache.doris.datasource.hive.event;
 
 import org.apache.doris.analysis.RedirectStatus;
+import org.apache.doris.analysis.UserIdentity;
 import org.apache.doris.catalog.Env;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.util.MasterDaemon;
@@ -29,6 +30,7 @@ import org.apache.doris.datasource.HMSExternalCatalog;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.qe.MasterOpExecutor;
 import org.apache.doris.qe.OriginStatement;
+import org.apache.doris.system.SystemInfoService;
 
 import com.google.common.collect.Maps;
 import org.apache.commons.lang3.StringUtils;
@@ -308,7 +310,12 @@ public class MetastoreEventsProcessor extends MasterDaemon {
         // Transfer to master to refresh catalog
         String sql = "REFRESH CATALOG " + hmsExternalCatalog.getName();
         OriginStatement originStmt = new OriginStatement(sql, 0);
-        MasterOpExecutor masterOpExecutor = new MasterOpExecutor(originStmt, new ConnectContext(),
+        ConnectContext ctx = new ConnectContext();
+        ctx.setQualifiedUser(UserIdentity.ROOT.getQualifiedUser());
+        ctx.setCurrentUserIdentity(UserIdentity.ROOT);
+        ctx.setEnv(Env.getCurrentEnv());
+        ctx.setCluster(SystemInfoService.DEFAULT_CLUSTER);
+        MasterOpExecutor masterOpExecutor = new MasterOpExecutor(originStmt, ctx,
                     RedirectStatus.FORWARD_WITH_SYNC, false);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Transfer to master to refresh catalog, stmt: {}", sql);
