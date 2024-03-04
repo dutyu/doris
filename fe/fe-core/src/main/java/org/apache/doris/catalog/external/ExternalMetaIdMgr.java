@@ -253,7 +253,7 @@ public class ExternalMetaIdMgr {
     }
 
     // invoke this method only on master
-    // try to reuse the exists ids
+    // try to reuse the existing ids
     public static long generateDbId(@Nullable CtlMetaIdMgr oldCtlMetaIdMgr,
                                     String dbName) {
         if (oldCtlMetaIdMgr == null) {
@@ -267,7 +267,7 @@ public class ExternalMetaIdMgr {
     }
 
     // invoke this method only on master
-    // try to reuse the exists ids
+    // try to reuse the existing ids
     public static long generateTblId(@Nullable CtlMetaIdMgr oldCtlMetaIdMgr,
                                      String dbName, String tblName) {
         if (oldCtlMetaIdMgr == null) {

@@ -871,7 +871,7 @@ struct TInitExternalCtlMetaRequest {
 }
 
 struct TInitExternalCtlMetaResult {
-    1: optional i64 maxJournalId;
+    1: optional i64 journalId;
     2: optional string status;
 }
 

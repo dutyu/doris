@@ -51,12 +51,6 @@ public abstract class IcebergExternalCatalog extends ExternalCatalog {
         super(catalogId, name, ExternalCatalog.Type.ICEBERG, comment);
     }
 
-    @Override
-    protected void initForMaster() {
-        nsCatalog = (SupportsNamespaces) catalog;
-        super.initForMaster();
-    }
-
     public Catalog getCatalog() {
         makeSureInitialized();
         return catalog;

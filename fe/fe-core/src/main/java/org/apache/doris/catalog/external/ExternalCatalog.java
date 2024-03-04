@@ -95,7 +95,8 @@ public abstract class ExternalCatalog
     protected Type type;
     // db name does not contains "default_cluster"
     protected Map<String, Long> dbNameToId = Maps.newConcurrentMap();
-    private boolean objectCreated = false;
+    private volatile boolean objectCreated = false;
+    private volatile long currentInitLogId;
 
     private ExternalSchemaCache schemaCache;
     private String comment;
@@ -155,7 +156,7 @@ public abstract class ExternalCatalog
      * Catalog can't be init when creating because the external catalog may depend on third system.
      * So you have to make sure the client of third system is initialized before any method was called.
      */
-    public final synchronized void makeSureInitialized() {
+    public final synchronized long makeSureInitialized() {
         initLocalObjects();
         if (!initialized) {
             if (!Env.getCurrentEnv().isMaster()) {
@@ -168,10 +169,11 @@ public abstract class ExternalCatalog
                     Util.logAndThrowRuntimeException(LOG,
                             String.format("failed to forward init catalog %s operation to master.", name), e);
                 }
-                return;
+                return currentInitLogId;
             }
             initForMaster();
         }
+        return currentInitLogId;
     }
 
     protected final void initLocalObjects() {
@@ -268,23 +270,26 @@ public abstract class ExternalCatalog
 
         }
         Env.getCurrentEnv().getExternalMetaIdMgr().replayMetaIdMappingsLog(log);
-        Env.getCurrentEnv().getEditLog().logMetaIdMappingsLog(log);
+        currentInitLogId = Env.getCurrentEnv().getEditLog().logMetaIdMappingsLog(log);
     }
 
-    protected synchronized void initForAllNodes(ExternalMetaIdMgr.CtlMetaIdMgr ctlMetaIdMgr, long lastUpdateTime) {
+    protected void initForAllNodes(ExternalMetaIdMgr.CtlMetaIdMgr ctlMetaIdMgr, long lastUpdateTime) {
         // use a temp map and replace the old one later
         Map<Long, ExternalDatabase<? extends ExternalTable>> tmpIdToDb = Maps.newConcurrentMap();
         Map<String, Long> tmpDbNameToId = Maps.newConcurrentMap();
         Map<String, ExternalMetaIdMgr.DbMetaIdMgr> dbNameToMgr = ctlMetaIdMgr.getDbNameToMgr();
-        // refresh all dbs, reuse the exists dbs if possible
+        // refresh all dbs
         for (String dbName : dbNameToMgr.keySet()) {
-            ExternalDatabase<? extends ExternalTable> db = dbNameToId.containsKey(dbName)
-                    ? idToDb.get(dbNameToId.get(dbName))
-                    : getDbForInit(dbName, dbNameToMgr.get(dbName).dbId, type);
+            // try to use existing db
+            ExternalDatabase<? extends ExternalTable> db = idToDb.getOrDefault(
+                        dbNameToId.getOrDefault(dbName, -1L), null);
+            if (db == null) {
+                db = getDbForInit(dbName, dbNameToMgr.get(dbName).dbId, type);
+            }
             Preconditions.checkNotNull(db);
             db.setUnInitialized(true);
             tmpIdToDb.put(db.getId(), db);
-            tmpDbNameToId.put(ClusterNamespace.getNameFromFullName(db.getFullName()), db.getId());
+            tmpDbNameToId.put(dbName, db.getId());
         }
         this.idToDb = tmpIdToDb;
         this.dbNameToId = tmpDbNameToId;

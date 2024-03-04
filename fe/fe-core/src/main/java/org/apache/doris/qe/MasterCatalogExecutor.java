@@ -25,6 +25,7 @@ import org.apache.doris.thrift.TInitExternalCtlMetaRequest;
 import org.apache.doris.thrift.TInitExternalCtlMetaResult;
 import org.apache.doris.thrift.TNetworkAddress;
 
+import com.google.common.base.Preconditions;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -52,7 +53,7 @@ public class MasterCatalogExecutor {
         int masterRpcPort = Env.getCurrentEnv().getMasterRpcPort();
         TNetworkAddress thriftAddress = new TNetworkAddress(masterHost, masterRpcPort);
 
-        FrontendService.Client client = null;
+        FrontendService.Client client;
         try {
             client = ClientPool.frontendPool.borrowObject(thriftAddress, waitTimeoutMs);
         } catch (Exception e) {
@@ -66,7 +67,8 @@ public class MasterCatalogExecutor {
         boolean isReturnToPool = false;
         try {
             TInitExternalCtlMetaResult result = client.initExternalCtlMeta(request);
-            Env.getCurrentEnv().getJournalObservable().waitOn(result.maxJournalId, waitTimeoutMs);
+            Preconditions.checkArgument(result.journalId > 0L);
+            Env.getCurrentEnv().getJournalObservable().waitOn(result.journalId, waitTimeoutMs);
             if (!result.getStatus().equalsIgnoreCase(STATUS_OK)) {
                 throw new UserException(result.getStatus());
             }

@@ -66,6 +66,7 @@ public abstract class ExternalDatabase<T extends ExternalTable> implements Datab
 
     protected volatile long lastUpdateTime;
     protected volatile boolean initialized = false;
+    protected volatile long currentInitLogId;
     protected volatile Map<Long, T> idToTbl = Maps.newConcurrentMap();
     protected volatile Map<String, Long> tableNameToId = Maps.newConcurrentMap();
 
@@ -100,7 +101,7 @@ public abstract class ExternalDatabase<T extends ExternalTable> implements Datab
         return initialized;
     }
 
-    public final synchronized void makeSureInitialized() {
+    public final synchronized long makeSureInitialized() {
         extCatalog.makeSureInitialized();
         if (!initialized) {
             if (!Env.getCurrentEnv().isMaster()) {
@@ -113,49 +114,49 @@ public abstract class ExternalDatabase<T extends ExternalTable> implements Datab
                     Util.logAndThrowRuntimeException(LOG,
                             String.format("failed to forward init external db %s operation to master", name), e);
                 }
-                return;
+                return currentInitLogId;
             }
             initForMaster();
         }
+        return currentInitLogId;
     }
 
     protected void initForMaster() {
         List<String> tableNames = extCatalog.listTableNames(null, name);
-        if (tableNames != null) {
-            MetaIdMappingsLog log = new MetaIdMappingsLog();
-            log.setCatalogId(extCatalog.getId());
-            log.setDbName(name);
-            log.setType(MetaIdMappingsLog.TYPE_FROM_INIT_DATABASE);
-            log.setLastUpdateTime(System.currentTimeMillis());
-            if (CollectionUtils.isNotEmpty(tableNames)) {
-                ExternalMetaIdMgr.CtlMetaIdMgr ctlMetaIdMgr = Env.getCurrentEnv().getExternalMetaIdMgr()
-                            .getCtlMetaIdMgr(extCatalog.getId());
-
-                for (String tableName : tableNames) {
-                    MetaIdMappingsLog.MetaIdMapping metaIdMapping = new MetaIdMappingsLog.MetaIdMapping(
-                            MetaIdMappingsLog.OPERATION_TYPE_ADD,
-                            MetaIdMappingsLog.META_OBJECT_TYPE_TABLE,
-                            name, tableName,
-                            ExternalMetaIdMgr.generateTblId(ctlMetaIdMgr != null ? ctlMetaIdMgr.copy() : null,
-                                        name, tableName));
-                    log.addMetaIdMapping(metaIdMapping);
-                }
+        MetaIdMappingsLog log = new MetaIdMappingsLog();
+        log.setCatalogId(extCatalog.getId());
+        log.setDbName(name);
+        log.setType(MetaIdMappingsLog.TYPE_FROM_INIT_DATABASE);
+        log.setLastUpdateTime(System.currentTimeMillis());
+        if (CollectionUtils.isNotEmpty(tableNames)) {
+            ExternalMetaIdMgr.CtlMetaIdMgr ctlMetaIdMgr = Env.getCurrentEnv().getExternalMetaIdMgr()
+                    .getCtlMetaIdMgr(extCatalog.getId());
+            for (String tableName : tableNames) {
+                MetaIdMappingsLog.MetaIdMapping metaIdMapping = new MetaIdMappingsLog.MetaIdMapping(
+                        MetaIdMappingsLog.OPERATION_TYPE_ADD,
+                        MetaIdMappingsLog.META_OBJECT_TYPE_TABLE,
+                        name, tableName,
+                        ExternalMetaIdMgr.generateTblId(ctlMetaIdMgr != null ? ctlMetaIdMgr.copy() : null,
+                                name, tableName));
+                log.addMetaIdMapping(metaIdMapping);
             }
-            Env.getCurrentEnv().getExternalMetaIdMgr().replayMetaIdMappingsLog(log);
-            Env.getCurrentEnv().getEditLog().logMetaIdMappingsLog(log);
         }
+        Env.getCurrentEnv().getExternalMetaIdMgr().replayMetaIdMappingsLog(log);
+        currentInitLogId = Env.getCurrentEnv().getEditLog().logMetaIdMappingsLog(log);
     }
 
-    protected synchronized void initForAllNodes(ExternalMetaIdMgr.DbMetaIdMgr dbMetaIdMgr, long lastUpdateTime) {
+    protected void initForAllNodes(ExternalMetaIdMgr.DbMetaIdMgr dbMetaIdMgr, long lastUpdateTime) {
         // use a temp map and replace the old one later
         Map<Long, T> tmpIdToTbl = Maps.newConcurrentMap();
         Map<String, Long> tmpTableNameToId = Maps.newConcurrentMap();
         Map<String, ExternalMetaIdMgr.TblMetaIdMgr> tblNameToMgr = dbMetaIdMgr.getTblNameToMgr();
-        // refresh all tables, reuse the exists tables if possible
+        // refresh all tables
         for (String tableName : tblNameToMgr.keySet()) {
-            T table = tableNameToId.containsKey(tableName)
-                        ? idToTbl.get(tableNameToId.get(tableName))
-                        : getExternalTable(tableName, tblNameToMgr.get(tableName).getTblId(), extCatalog);
+            // try to use existing table
+            T table = idToTbl.getOrDefault(tableNameToId.getOrDefault(tableName, -1L), null);
+            if (table == null) {
+                table = getExternalTable(tableName, tblNameToMgr.get(tableName).getTblId(), extCatalog);
+            }
             Preconditions.checkNotNull(table);
             table.unsetObjectCreated();
             tmpIdToTbl.put(table.getId(), table);
