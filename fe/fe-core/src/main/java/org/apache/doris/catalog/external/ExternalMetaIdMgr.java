@@ -108,8 +108,16 @@ public class ExternalMetaIdMgr {
 
     public void replayMetaIdMappingsLog(@NotNull MetaIdMappingsLog log) {
         Preconditions.checkNotNull(log);
+
+        if (Env.isCheckpointThread()) {
+            // because ExternalMetaIdMgr is not serialized,
+            // so we can skip the MetaIdMappingsLog at checkpoint thread
+            return;
+        }
+
         long catalogId = log.getCatalogId();
         CatalogIf<?> catalogIf = Env.getCurrentEnv().getCatalogMgr().getCatalog(catalogId);
+        // skip the log if the catalog is not exists
         if (catalogIf == null) {
             return;
         }
