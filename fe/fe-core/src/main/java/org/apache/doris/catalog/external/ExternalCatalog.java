@@ -96,7 +96,7 @@ public abstract class ExternalCatalog
     // db name does not contains "default_cluster"
     protected Map<String, Long> dbNameToId = Maps.newConcurrentMap();
     private volatile boolean objectCreated = false;
-    private volatile long currentInitLogId;
+    private volatile long lastInitJournalId;
 
     private ExternalSchemaCache schemaCache;
     private String comment;
@@ -156,7 +156,7 @@ public abstract class ExternalCatalog
      * Catalog can't be init when creating because the external catalog may depend on third system.
      * So you have to make sure the client of third system is initialized before any method was called.
      */
-    public final synchronized long makeSureInitialized() {
+    public final synchronized void makeSureInitialized() {
         initLocalObjects();
         if (!initialized) {
             if (!Env.getCurrentEnv().isMaster()) {
@@ -169,11 +169,10 @@ public abstract class ExternalCatalog
                     Util.logAndThrowRuntimeException(LOG,
                             String.format("failed to forward init catalog %s operation to master.", name), e);
                 }
-                return currentInitLogId;
+                return;
             }
             initForMaster();
         }
-        return currentInitLogId;
     }
 
     protected final void initLocalObjects() {
@@ -270,7 +269,7 @@ public abstract class ExternalCatalog
 
         }
         Env.getCurrentEnv().getExternalMetaIdMgr().replayMetaIdMappingsLog(log);
-        currentInitLogId = Env.getCurrentEnv().getEditLog().logMetaIdMappingsLog(log);
+        lastInitJournalId = Env.getCurrentEnv().getEditLog().logMetaIdMappingsLog(log);
     }
 
     protected void initForAllNodes(ExternalMetaIdMgr.CtlMetaIdMgr ctlMetaIdMgr, long lastUpdateTime) {
@@ -592,6 +591,10 @@ public abstract class ExternalCatalog
     @Override
     public ConcurrentHashMap<Long, DatabaseIf> getIdToDb() {
         return new ConcurrentHashMap<>(idToDb);
+    }
+
+    public long getLastInitJournalId() {
+        return this.lastInitJournalId;
     }
 
     public enum Type {

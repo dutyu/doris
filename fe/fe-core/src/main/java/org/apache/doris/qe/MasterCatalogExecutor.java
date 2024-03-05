@@ -61,14 +61,15 @@ public class MasterCatalogExecutor {
         }
         TInitExternalCtlMetaRequest request = new TInitExternalCtlMetaRequest();
         request.setCatalogId(catalogId);
+        request.setMaxJournalId(Env.getCurrentEnv().getMaxJournalId());
         if (dbId != -1) {
             request.setDbId(dbId);
         }
         boolean isReturnToPool = false;
         try {
             TInitExternalCtlMetaResult result = client.initExternalCtlMeta(request);
-            Preconditions.checkArgument(result.journalId > 0L);
-            Env.getCurrentEnv().getJournalObservable().waitOn(result.journalId, waitTimeoutMs);
+            Preconditions.checkArgument(result.maxJournalId > 0L);
+            Env.getCurrentEnv().getJournalObservable().waitOn(result.maxJournalId, waitTimeoutMs);
             if (!result.getStatus().equalsIgnoreCase(STATUS_OK)) {
                 throw new UserException(result.getStatus());
             }

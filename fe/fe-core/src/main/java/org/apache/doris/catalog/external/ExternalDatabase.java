@@ -66,7 +66,7 @@ public abstract class ExternalDatabase<T extends ExternalTable> implements Datab
 
     protected volatile long lastUpdateTime;
     protected volatile boolean initialized = false;
-    protected volatile long currentInitLogId;
+    protected volatile long lastInitJournalId;
     protected volatile Map<Long, T> idToTbl = Maps.newConcurrentMap();
     protected volatile Map<String, Long> tableNameToId = Maps.newConcurrentMap();
 
@@ -101,7 +101,7 @@ public abstract class ExternalDatabase<T extends ExternalTable> implements Datab
         return initialized;
     }
 
-    public final synchronized long makeSureInitialized() {
+    public final synchronized void makeSureInitialized() {
         extCatalog.makeSureInitialized();
         if (!initialized) {
             if (!Env.getCurrentEnv().isMaster()) {
@@ -114,11 +114,10 @@ public abstract class ExternalDatabase<T extends ExternalTable> implements Datab
                     Util.logAndThrowRuntimeException(LOG,
                             String.format("failed to forward init external db %s operation to master", name), e);
                 }
-                return currentInitLogId;
+                return;
             }
             initForMaster();
         }
-        return currentInitLogId;
     }
 
     protected void initForMaster() {
@@ -142,7 +141,7 @@ public abstract class ExternalDatabase<T extends ExternalTable> implements Datab
             }
         }
         Env.getCurrentEnv().getExternalMetaIdMgr().replayMetaIdMappingsLog(log);
-        currentInitLogId = Env.getCurrentEnv().getEditLog().logMetaIdMappingsLog(log);
+        lastInitJournalId = Env.getCurrentEnv().getEditLog().logMetaIdMappingsLog(log);
     }
 
     protected void initForAllNodes(ExternalMetaIdMgr.DbMetaIdMgr dbMetaIdMgr, long lastUpdateTime) {
@@ -324,5 +323,9 @@ public abstract class ExternalDatabase<T extends ExternalTable> implements Datab
     @Override
     public Map<Long, TableIf> getIdToTable() {
         return new HashMap<>(idToTbl);
+    }
+
+    public long getLastInitJournalId() {
+        return this.lastInitJournalId;
     }
 }
