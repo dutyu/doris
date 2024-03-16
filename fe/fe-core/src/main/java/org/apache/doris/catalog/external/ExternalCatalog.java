@@ -279,16 +279,12 @@ public abstract class ExternalCatalog
         Map<String, ExternalMetaIdMgr.DbMetaIdMgr> dbNameToMgr = ctlMetaIdMgr.getDbNameToMgr();
         // refresh all dbs
         for (String dbName : dbNameToMgr.keySet()) {
-            // try to use existing db
-            ExternalDatabase<? extends ExternalTable> db = idToDb.getOrDefault(
-                        dbNameToId.getOrDefault(dbName, -1L), null);
-            if (db == null) {
-                db = getDbForInit(dbName, dbNameToMgr.get(dbName).dbId, type);
-            }
+            ExternalDatabase<? extends ExternalTable> db = getDbForInit(dbName, dbNameToMgr.get(dbName).dbId, type);
             Preconditions.checkNotNull(db);
             db.setUnInitialized(true);
             tmpIdToDb.put(db.getId(), db);
             tmpDbNameToId.put(dbName, db.getId());
+            LOG.info("init for db: {}, dbId: {}", dbName, db.getId());
         }
         this.idToDb = tmpIdToDb;
         this.dbNameToId = tmpDbNameToId;

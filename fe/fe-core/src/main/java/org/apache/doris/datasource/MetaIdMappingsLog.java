@@ -57,9 +57,6 @@ public class MetaIdMappingsLog implements Writable {
     @SerializedName(value = "ctlId")
     private long catalogId = -1L;
 
-    @SerializedName(value = "dbId")
-    private long dbId = -1L;
-
     @SerializedName(value = "dbName")
     private String dbName;
 

@@ -115,6 +115,7 @@ public class ExternalMetaIdMgr {
             return;
         }
 
+        LOG.info("Replay MetaIdMappingsLog from: {}", log.getType());
         long catalogId = log.getCatalogId();
         CatalogIf<?> catalogIf = Env.getCurrentEnv().getCatalogMgr().getCatalog(catalogId);
         // skip the log if the catalog is not exists
@@ -174,6 +175,8 @@ public class ExternalMetaIdMgr {
     // no lock because the operations is serialized currently
     private void handleMetaIdMapping(MetaIdMappingsLog.MetaIdMapping mapping,
                                      CtlMetaIdMgr ctlMetaIdMgr) {
+        LOG.info("handle meta id mapping, id: {}, opType: {}, metaObjType: {}",
+                    mapping.getId(), mapping.getOpType(), mapping.getMetaObjType());
         MetaIdMappingsLog.OperationType opType = MetaIdMappingsLog.getOperationType(mapping.getOpType());
         MetaIdMappingsLog.MetaObjectType objType = MetaIdMappingsLog.getMetaObjectType(mapping.getMetaObjType());
         switch (opType) {
@@ -264,14 +267,21 @@ public class ExternalMetaIdMgr {
     // try to reuse the existing ids
     public static long generateDbId(@Nullable CtlMetaIdMgr oldCtlMetaIdMgr,
                                     String dbName) {
+        long dbId;
         if (oldCtlMetaIdMgr == null) {
-            return nextMetaId();
+            dbId = nextMetaId();
+            LOG.info("Generate a new id for db: {}, dbId: {}", dbName, dbId);
+            return dbId;
         }
         DbMetaIdMgr dbMetaIdMgr = oldCtlMetaIdMgr.dbNameToMgr.get(dbName);
         if (dbMetaIdMgr == null) {
-            return nextMetaId();
+            dbId = nextMetaId();
+            LOG.info("Generate a new id for db: {}, dbId: {}", dbName, dbId);
+            return dbId;
         }
-        return dbMetaIdMgr.dbId == META_ID_FOR_NOT_EXISTS ? nextMetaId() : dbMetaIdMgr.dbId;
+        dbId = dbMetaIdMgr.dbId == META_ID_FOR_NOT_EXISTS ? nextMetaId() : dbMetaIdMgr.dbId;
+        LOG.info("Generate a new id for db: {}, dbId: {}, dbId from meta mgr: {}", dbName, dbId, dbMetaIdMgr.dbId);
+        return dbId;
     }
 
     // invoke this method only on master

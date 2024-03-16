@@ -151,11 +151,7 @@ public abstract class ExternalDatabase<T extends ExternalTable> implements Datab
         Map<String, ExternalMetaIdMgr.TblMetaIdMgr> tblNameToMgr = dbMetaIdMgr.getTblNameToMgr();
         // refresh all tables
         for (String tableName : tblNameToMgr.keySet()) {
-            // try to use existing table
-            T table = idToTbl.getOrDefault(tableNameToId.getOrDefault(tableName, -1L), null);
-            if (table == null) {
-                table = getExternalTable(tableName, tblNameToMgr.get(tableName).getTblId(), extCatalog);
-            }
+            T table = getExternalTable(tableName, tblNameToMgr.get(tableName).getTblId(), extCatalog);
             Preconditions.checkNotNull(table);
             table.unsetObjectCreated();
             tmpIdToTbl.put(table.getId(), table);
